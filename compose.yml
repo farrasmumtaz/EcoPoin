@@ -1,0 +1,36 @@
+name: ecopoin
+
+services:
+  ep-be:
+    build:
+      context: ./ep-be
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      SUPABASE_URL: ${SUPABASE_URL:?Set SUPABASE_URL in .env}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:?Set SUPABASE_SERVICE_ROLE_KEY in .env}
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env}
+    ports:
+      - "${EP_BE_HOST_PORT:-3101}:3001"
+    networks:
+      - frontend
+
+  ep-fe:
+    build:
+      context: ./ep-fe
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:${EP_BE_HOST_PORT:-3101}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+    ports:
+      - "${EP_FE_HOST_PORT:-3100}:3000"
+    depends_on:
+      - ep-be
+    networks:
+      - frontend
+
+networks:
+  frontend:
