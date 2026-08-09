@@ -239,19 +239,6 @@ cd ../ep-be && npm run lint && npx tsc --noEmit && npm run build
 - Foto dibatasi berdasarkan MIME type, ukuran, dan storage path organisasi.
 - Audit log tidak menyimpan password, token publik, atau secret.
 
-## Roadmap
-
-| Periode | Fokus | Deliverable utama |
-| --- | --- | --- |
-| 3-9 Agustus 2026 | Riset dan fondasi | Validasi lapangan, scope, ERD, wireframe, repository, deploy awal |
-| 10-16 Agustus 2026 | Auth dan setoran | RLS, login, master warga/sampah, foto, daftar setoran |
-| 17-23 Agustus 2026 | Verifikasi, poin, dan struk | Ledger, penukaran, QR, WhatsApp, pengujian keamanan |
-| 24-30 Agustus 2026 | Dampak, laporan, dan polish | Dashboard, metodologi, responsivitas, aksesibilitas |
-| 31 Agustus-3 September 2026 | Feature freeze dan submit | Bug bash, data demo, dokumentasi, production verification |
-| 4-6 September 2026 | Buffer | Perbaikan masalah teknis tanpa fitur baru |
-
-Target keberhasilan MVP meliputi akurasi saldo 100% terhadap ledger, tidak ada kredit/debit ganda, median pencatatan maksimal 90 detik, serta keberhasilan alur utama minimal 95% pada pengujian end-to-end.
-
 ## Kontribusi
 
 Gunakan feature branch dari `develop` dan ajukan pull request setelah quality gate lokal lulus.
@@ -275,7 +262,7 @@ feature/* -> develop -> main
 
 Direct push dan force push ke `main` tidak diperbolehkan.
 
-## Kaitan dengan SDGs
+## SDGs
 
 - **SDG 11 - Sustainable Cities and Communities:** membantu komunitas mengelola sampah secara transparan dan berbasis data.
 - **SDG 9 - Industry, Innovation and Infrastructure:** memperluas adopsi infrastruktur digital pada layanan komunitas tingkat RW/RT.
