@@ -56,6 +56,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Generate clients
+        run: npm run prisma:generate --if-present
+
       - name: Lint
         run: npm run lint
 
