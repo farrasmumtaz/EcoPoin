@@ -140,6 +140,7 @@ Buat `ep-be/.env`:
 
 ```env
 SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 DATABASE_URL=postgresql://user:password@host:6543/postgres
 ```
@@ -272,4 +273,3 @@ EcoPoin selaras dengan subtema **Smart Sustainable Digital Solution for Inclusiv
 ## Tim
 
 EcoPoin dikembangkan oleh tim mahasiswa beranggotakan tiga orang untuk ITechno Cup 2026.
-
