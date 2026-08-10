@@ -10,7 +10,7 @@ EcoPoin adalah platform web untuk mendigitalkan operasional bank sampah tingkat 
 
 Proyek ini dikembangkan oleh tim beranggotakan tiga orang untuk kategori Web Development ITechno Cup 2026, dengan target MVP pada 3 September 2026.
 
-> Status: tahap fondasi teknis. Struktur aplikasi, CI, dan container development sudah tersedia; fitur bisnis pada bagian roadmap masih dalam pengembangan.
+> Status: tahap pengembangan MVP. Fondasi teknis dan autentikasi pengurus sudah tersedia; modul transaksi pada roadmap masih dalam pengembangan.
 
 ## Masalah yang Diselesaikan
 
@@ -143,6 +143,7 @@ SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 DATABASE_URL=postgresql://user:password@host:6543/postgres
+FRONTEND_URL=http://localhost:3000
 ```
 
 Buat `ep-fe/.env.local`:
@@ -218,6 +219,24 @@ Validasi lokal sebelum push:
 cd ep-fe && npm run lint && npx tsc --noEmit && npm run build
 cd ../ep-be && npm run lint && npx tsc --noEmit && npm run build
 ```
+
+## Authentication API
+
+| Method | Endpoint | Keterangan |
+| --- | --- | --- |
+| `POST` | `/api/auth/login` | Login email/password dan membuat sesi HttpOnly cookie |
+| `POST` | `/api/auth/logout` | Mencabut sesi aktif pada perangkat saat ini |
+| `GET` | `/api/auth/me` | Mengembalikan identity, organisasi, dan role pengguna aktif |
+
+Frontend harus mengirim request dengan credentials agar cookie sesi diterima dan dikirim kembali:
+
+```ts
+await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/me`, {
+  credentials: "include",
+});
+```
+
+Role yang didukung adalah `ADMIN`, `OPERATOR`, dan `COORDINATOR`. Nilai `role` dan `organization_id` disimpan pada Supabase `app_metadata`, bukan `user_metadata`, agar tidak dapat diubah oleh pengguna.
 
 ## Aturan Bisnis Kritis
 

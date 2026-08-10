@@ -3,6 +3,7 @@ import { z } from "zod";
 const serverEnvSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
+  FRONTEND_URL: z.url("FRONTEND_URL must be a valid URL"),
   SUPABASE_URL: z.url("SUPABASE_URL must be a valid URL"),
   SUPABASE_PUBLISHABLE_KEY: z
     .string()
