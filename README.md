@@ -46,6 +46,21 @@ EcoPoin memindahkan proses tersebut ke transaksi terstruktur dengan prinsip audi
 - Dashboard KPI, tren setoran, komposisi sampah, dan leaderboard RT.
 - Laporan CSV serta metodologi estimasi dampak yang dapat ditelusuri.
 
+### Status Implementasi
+
+Daftar fitur di atas merupakan target MVP. Status implementasi repository saat ini adalah:
+
+- [x] Fondasi database PostgreSQL, index, constraint, trigger, dan RLS.
+- [x] Autentikasi pengurus: login, logout, dan pemeriksaan sesi.
+- [x] Identitas organisasi dan role `ADMIN`, `OPERATOR`, dan `COORDINATOR`.
+- [x] Health check API, Docker Compose, dan CI GitHub Actions.
+- [ ] Manajemen warga/nasabah.
+- [ ] Master jenis sampah, nilai poin, dan faktor dampak.
+- [ ] Pencatatan serta verifikasi setoran.
+- [ ] Ledger saldo dan penukaran poin.
+- [ ] Struk publik, QR, dan integrasi WhatsApp.
+- [ ] Dashboard KPI, laporan, dan estimasi dampak.
+
 ### Pembeda Utama
 
 - Warga tidak diwajibkan membuat akun atau memasang aplikasi.
@@ -143,6 +158,7 @@ SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 DATABASE_URL=postgresql://user:password@host:6543/postgres
+DIRECT_URL=postgresql://user:password@host:5432/postgres?sslmode=require
 FRONTEND_URL=http://localhost:3000
 ```
 
@@ -154,7 +170,27 @@ NEXT_PUBLIC_API_URL=http://localhost:3001
 
 `SUPABASE_SERVICE_ROLE_KEY` hanya boleh tersedia di backend. Jangan gunakan prefix `NEXT_PUBLIC_` untuk secret apa pun.
 
-### 4. Jalankan aplikasi
+`DATABASE_URL` digunakan aplikasi saat runtime. `DIRECT_URL` digunakan Prisma
+untuk migrasi; pada jaringan IPv4 gunakan URL **Session pooler** Supabase port
+`5432`. Password yang mengandung karakter khusus harus di-percent-encode pada
+connection string.
+
+### 4. Terapkan migrasi database
+
+Pastikan project Supabase yang dituju benar sebelum menjalankan migrasi:
+
+```bash
+cd ep-be
+npx prisma migrate deploy
+npx prisma generate
+npx prisma migrate status
+```
+
+Migration membuat tabel, index, constraint, trigger, dan kebijakan RLS untuk
+fondasi MVP. Untuk verifikasi tambahan, jalankan
+`ep-be/prisma/verify-foundation.sql` melalui Supabase SQL Editor.
+
+### 5. Jalankan aplikasi
 
 Terminal frontend:
 
@@ -171,6 +207,19 @@ npm run dev -- --port 3001
 ```
 
 Akses frontend di `http://localhost:3000` dan backend di `http://localhost:3001`.
+
+## Cara Menggunakan
+
+1. Buka frontend di `http://localhost:3000`.
+2. Login menggunakan akun pengurus yang sudah dibuat di Supabase Auth.
+3. Backend memvalidasi sesi HttpOnly cookie serta membaca `organization_id`
+   dan `role` dari protected `app_metadata`.
+4. Endpoint `GET /api/auth/me` dapat digunakan untuk memastikan identitas,
+   organisasi, dan role pengguna aktif.
+5. Gunakan `POST /api/auth/logout` untuk mengakhiri sesi pada perangkat aktif.
+
+Modul transaksi, dashboard, serta halaman publik masih mengikuti status pada
+bagian **Status Implementasi** dan akan tersedia secara bertahap.
 
 ## Menjalankan dengan Docker
 
@@ -261,26 +310,31 @@ Role yang didukung adalah `ADMIN`, `OPERATOR`, dan `COORDINATOR`. Nilai `role` d
 
 ## Kontribusi
 
-Gunakan feature branch dari `develop` dan ajukan pull request setelah quality gate lokal lulus.
+Setiap anggota bekerja pada branch masing-masing yang dibuat dari `main`, lalu
+mengajukan pull request ke `main` setelah quality gate lokal lulus. Contoh
+berikut menggunakan branch `farras`:
 
 ```bash
-git switch develop
-git pull --ff-only origin develop
-git switch -c feature/nama-fitur
+git switch main
+git pull --ff-only origin main
+git switch farras
+git merge main
 
 # setelah implementasi
 git add .
 git commit -m "feat(scope): deskripsi perubahan"
-git push -u origin feature/nama-fitur
+git push origin farras
 ```
 
 Alur merge:
 
 ```text
-feature/* -> develop -> main
+branch anggota -> pull request + review -> main
 ```
 
-Direct push dan force push ke `main` tidak diperbolehkan.
+Satu fitur dibuat dalam commit yang terfokus. Direct push dan force push ke
+`main` tidak diperbolehkan. CI otomatis berjalan ketika pull request menuju
+`main` dibuat atau diperbarui.
 
 ## SDGs
 
