@@ -55,7 +55,8 @@ Daftar fitur di atas merupakan target MVP. Status implementasi repository saat i
 - [x] Identitas organisasi dan role `ADMIN`, `OPERATOR`, dan `COORDINATOR`.
 - [x] Health check API, Docker Compose, dan CI GitHub Actions.
 - [ ] Manajemen warga/nasabah.
-- [ ] Master jenis sampah, nilai poin, dan faktor dampak.
+- [x] Master jenis sampah dan nilai poin per kilogram.
+- [ ] Master faktor dampak lingkungan.
 - [ ] Pencatatan serta verifikasi setoran.
 - [ ] Ledger saldo dan penukaran poin.
 - [ ] Struk publik, QR, dan integrasi WhatsApp.
@@ -286,6 +287,23 @@ await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/me`, {
 ```
 
 Role yang didukung adalah `ADMIN`, `OPERATOR`, dan `COORDINATOR`. Nilai `role` dan `organization_id` disimpan pada Supabase `app_metadata`, bukan `user_metadata`, agar tidak dapat diubah oleh pengguna.
+
+## Waste Type API
+
+Semua endpoint membutuhkan sesi pengurus. Operasi tulis hanya dapat dilakukan
+oleh role `ADMIN`; data selalu dibatasi berdasarkan `organization_id` dari sesi.
+
+| Method | Endpoint | Akses | Keterangan |
+| --- | --- | --- | --- |
+| `GET` | `/api/waste-types` | Semua role | Daftar, pencarian, filter, dan pagination |
+| `POST` | `/api/waste-types` | `ADMIN` | Membuat jenis sampah dan poin/kg |
+| `GET` | `/api/waste-types/:id` | Semua role | Detail jenis sampah |
+| `PATCH` | `/api/waste-types/:id` | `ADMIN` | Memperbarui master data |
+| `DELETE` | `/api/waste-types/:id` | `ADMIN` | Menonaktifkan data (soft-delete) |
+
+Query daftar yang tersedia adalah `category`, `isActive`, `search`, `page`, dan
+`limit`. Nilai `pointsPerKg` dikirim sebagai string desimal pada response untuk
+menjaga presisi data PostgreSQL.
 
 ## Aturan Bisnis Kritis
 
