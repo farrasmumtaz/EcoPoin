@@ -1,5 +1,5 @@
 import type { Prisma, WasteType } from "@/generated/prisma/client";
-import { prisma } from "@/infrastructure/database/prisma";
+import { getPrisma } from "@/infrastructure/database/prisma";
 import {
   WasteTypeNameConflictError,
   WasteTypeNotFoundError,
@@ -32,6 +32,7 @@ async function assertNameAvailable(
   name: string,
   excludeId?: string,
 ): Promise<void> {
+  const prisma = getPrisma();
   const existing = await prisma.wasteType.findFirst({
     where: {
       organizationId,
@@ -48,6 +49,7 @@ export async function listWasteTypes(
   organizationId: string,
   input: ListWasteTypesInput,
 ): Promise<PaginatedWasteTypes> {
+  const prisma = getPrisma();
   const where: Prisma.WasteTypeWhereInput = {
     organizationId,
     ...(input.category ? { category: input.category } : {}),
@@ -82,6 +84,7 @@ export async function getWasteType(
   organizationId: string,
   id: string,
 ): Promise<WasteTypeDto> {
+  const prisma = getPrisma();
   const wasteType = await prisma.wasteType.findFirst({
     where: { id, organizationId },
   });
@@ -94,6 +97,7 @@ export async function createWasteType(
   input: CreateWasteTypeInput,
 ): Promise<WasteTypeDto> {
   await assertNameAvailable(organizationId, input.name);
+  const prisma = getPrisma();
   const wasteType = await prisma.wasteType.create({
     data: { organizationId, ...input },
   });
@@ -108,6 +112,7 @@ export async function updateWasteType(
   await getWasteType(organizationId, id);
   if (input.name) await assertNameAvailable(organizationId, input.name, id);
 
+  const prisma = getPrisma();
   const wasteType = await prisma.wasteType.update({
     where: { id },
     data: input,
@@ -120,6 +125,7 @@ export async function deactivateWasteType(
   id: string,
 ): Promise<WasteTypeDto> {
   await getWasteType(organizationId, id);
+  const prisma = getPrisma();
   const wasteType = await prisma.wasteType.update({
     where: { id },
     data: { isActive: false },
