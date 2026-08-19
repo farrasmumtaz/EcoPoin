@@ -15,6 +15,13 @@ enum UserRole {
   @@map("user_role")
 }
 
+enum MemberType {
+  INDIVIDUAL
+  UNIT
+
+  @@map("member_type")
+}
+
 enum WasteCategory {
   ORGANIC
   INORGANIC
@@ -53,20 +60,22 @@ enum RedemptionStatus {
 }
 
 model Organization {
-  id           String   @id @default(uuid()) @db.Uuid
-  name         String   @db.VarChar(160)
-  address      String?  @db.VarChar(500)
-  contactPhone String?  @map("contact_phone") @db.VarChar(32)
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id                    String   @id @default(uuid()) @db.Uuid
+  name                  String   @db.VarChar(160)
+  address               String?  @db.VarChar(500)
+  contactPhone          String?  @map("contact_phone") @db.VarChar(32)
+  activityThresholdDays Int      @default(90) @map("activity_threshold_days")
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt             DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  profiles    Profile[]
-  members     Member[]
-  wasteTypes  WasteType[]
-  deposits    Deposit[]
-  ledger      PointLedger[]
-  redemptions Redemption[]
-  auditLogs   AuditLog[]
+  profiles            Profile[]
+  members             Member[]
+  wasteTypes          WasteType[]
+  deposits            Deposit[]
+  ledger              PointLedger[]
+  redemptions         Redemption[]
+  auditLogs           AuditLog[]
+  memberRelationships MemberRelationship[]
 
   @@map("organizations")
 }
@@ -93,26 +102,51 @@ model Profile {
 }
 
 model Member {
+  id             String     @id @default(uuid()) @db.Uuid
+  organizationId String     @map("organization_id") @db.Uuid
+  memberNumber   String     @map("member_number") @db.VarChar(32)
+  fullName       String     @map("full_name") @db.VarChar(160)
+  type           MemberType @default(INDIVIDUAL)
+  rt             String?    @db.VarChar(16)
+  phone          String?    @db.VarChar(32)
+  picName        String?    @map("pic_name") @db.VarChar(160)
+  picPhone       String?    @map("pic_phone") @db.VarChar(32)
+  publicToken    String     @unique @default(uuid()) @map("public_token") @db.Uuid
+  isActive       Boolean    @default(true) @map("is_active")
+  lastActivityAt DateTime?  @map("last_activity_at") @db.Timestamptz(3)
+  createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization            Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  deposits                Deposit[]
+  ledger                  PointLedger[]
+  redemptions             Redemption[]
+  individualRelationships MemberRelationship[] @relation("RelationshipIndividual")
+  unitRelationships       MemberRelationship[] @relation("RelationshipUnit")
+
+  @@unique([organizationId, memberNumber])
+  @@index([organizationId, type, isActive, fullName])
+  @@index([organizationId, lastActivityAt])
+  @@map("members")
+}
+
+model MemberRelationship {
   id             String   @id @default(uuid()) @db.Uuid
   organizationId String   @map("organization_id") @db.Uuid
-  memberNumber   String   @map("member_number") @db.VarChar(32)
-  fullName       String   @map("full_name") @db.VarChar(160)
-  rt             String   @db.VarChar(16)
-  phone          String?  @db.VarChar(32)
-  publicToken    String   @unique @default(uuid()) @map("public_token") @db.Uuid
+  individualId   String   @map("individual_id") @db.Uuid
+  unitId         String   @map("unit_id") @db.Uuid
   isActive       Boolean  @default(true) @map("is_active")
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  deposits     Deposit[]
-  ledger       PointLedger[]
-  redemptions  Redemption[]
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  individual   Member       @relation("RelationshipIndividual", fields: [individualId], references: [id], onDelete: Restrict)
+  unit         Member       @relation("RelationshipUnit", fields: [unitId], references: [id], onDelete: Restrict)
 
-  @@unique([organizationId, memberNumber])
-  @@index([organizationId, fullName])
-  @@index([organizationId, rt, isActive])
-  @@map("members")
+  @@unique([organizationId, individualId, unitId])
+  @@index([organizationId, unitId, isActive])
+  @@index([organizationId, individualId, isActive])
+  @@map("member_relationships")
 }
 
 model WasteType {
