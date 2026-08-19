@@ -6,80 +6,250 @@
 ![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3FCF8E?logo=supabase&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)
 
-EcoPoin adalah platform web untuk mendigitalkan operasional bank sampah tingkat RW: pencatatan setoran, verifikasi, ledger poin, penukaran, laporan, dan estimasi dampak lingkungan. Warga dapat melihat struk, saldo, dan riwayat melalui tautan publik atau QR tanpa registrasi dan tanpa memasang aplikasi.
+EcoPoin adalah platform web untuk mengubah catatan transaksi bank sampah yang datar dan tercampur menjadi profil nasabah, saldo, buku tabungan digital, riwayat aktivitas, serta rekap individu dan unit yang dapat ditelusuri.
 
-Proyek ini dikembangkan oleh tim beranggotakan tiga orang untuk kategori Web Development ITechno Cup 2026, dengan target MVP pada 3 September 2026.
+Produk mendukung dua pola adopsi:
 
-> Status: tahap pengembangan MVP. Fondasi teknis dan autentikasi pengurus sudah tersedia; modul transaksi pada roadmap masih dalam pengembangan.
+- bank sampah yang masih manual dapat mencatat transaksi langsung di EcoPoin;
+- bank sampah yang sudah komputerisasi dapat mengimpor CSV/XLSX tanpa mengganti sistem operasionalnya secara paksa.
+
+> Status produk: provisional berdasarkan wawancara lapangan pertama dari lima rekaman. Scope belum memasuki feature freeze.
+
+## Dasar Riset
+
+Wawancara dilakukan kepada pengurus Bank Sampah Induk Kota Bandung di bawah DLH pada 18 Agustus 2026 
+
+Temuan utama:
+- transaksi sudah dicatat di laptop dan nota sudah dicetak;
+- buku tabungan warga masih manual dan sering ditulis dua kali karena risiko hilang;
+- catatan harian individu dan unit tercampur;
+- pengurus tidak mengetahui nasabah atau unit yang masih aktif;
+- nasabah dapat menerima tunai langsung atau memasukkan hasil setoran ke tabungan;
+- terdapat saldo dan proses penarikan nyata;
+- perbedaan persepsi jenis/kondisi sampah menyebabkan perbedaan harga;
+- permintaan penjemputan masih manual;
+- sampah organik ditangani unit kelembagaan terpisah.
+
+Karena itu EcoPoin tidak lagi diposisikan hanya sebagai aplikasi pencatatan setoran atau sistem poin.
 
 ## Masalah yang Diselesaikan
 
-Operasional bank sampah RW masih sering bergantung pada buku tulis dan rekap manual. Dampaknya:
+Data transaksi yang tidak terhubung kuat dengan entitas nasabah menyebabkan pengurus hanya mengetahui total bulanan. Pengurus belum dapat menjawab secara cepat:
 
-- data setoran rawan hilang, salah catat, dan sulit ditelusuri;
-- warga harus menghubungi pengurus untuk mengetahui saldo;
-- laporan bulanan memerlukan rekap manual berulang;
-- dampak lingkungan program sulit dibuktikan menggunakan data;
-- perubahan nilai poin dan koreksi transaksi sulit diaudit.
+- kapan seorang nasabah terakhir menabung;
+- berapa saldo dan mutasi yang membentuk saldo tersebut;
+- siapa yang masih aktif atau mulai pasif;
+- berapa setoran setiap unit per bulan;
+- transaksi mana yang tunai langsung dan mana yang masuk tabungan;
+- harga versi mana yang digunakan pada transaksi lama;
+- apakah saldo sistem cocok dengan buku fisik atau data sebelumnya.
 
-EcoPoin memindahkan proses tersebut ke transaksi terstruktur dengan prinsip auditability: saldo dihitung dari ledger, setoran terverifikasi tidak diedit langsung, dan koreksi dilakukan melalui reversal.
+## Posisi Produk
 
-## Target Pengguna
+EcoPoin merupakan **customer, savings, and activity intelligence layer for waste banks**.
 
-| Pengguna | Kebutuhan utama | Akses |
-| --- | --- | --- |
-| Pengurus/operator | Mengelola warga, jenis sampah, setoran, verifikasi, dan penukaran | Dashboard terlindungi |
-| Ketua/koordinator | Memantau aktivitas, saldo, laporan, dan dampak | Dashboard terlindungi |
-| Warga/nasabah | Melihat struk, saldo, dan riwayat tanpa membuat akun | Tautan publik bertoken/QR |
-| Pemangku kepentingan RW | Mengevaluasi hasil dan dampak program | Laporan pengurus |
+EcoPoin bukan:
+
+- aplikasi yang memaksa semua bank sampah mengganti sistem lama;
+- sistem poin dan penukaran hadiah;
+- marketplace sampah;
+- aplikasi optimasi rute armada;
+- modul pengolahan sampah organik;
+- klasifikasi sampah otomatis berbasis AI.
+
+## Alur Utama
+
+```text
+Nasabah individu/unit
+        |
+        v
+Klasifikasi jenis dan kondisi sampah
+        |
+        v
+Penimbangan per jenis
+        |
+        v
+Harga aktif + snapshot -> subtotal -> total
+        |
+        v
+Finalisasi transaksi
+        |
+        +--------------------------+
+        |                          |
+        v                          v
+DIRECT_CASH                    SAVINGS
+catat pembayaran              kredit ledger
+saldo tidak bertambah         saldo bertambah
+        |                          |
+        +------------+-------------+
+                     v
+              nota + history
+                     |
+                     v
+       buku tabungan digital / QR
+```
+
+Penarikan tabungan menggunakan alur terpisah:
+
+```text
+REQUESTED -> APPROVED -> PAID -> debit ledger
+         \-> REJECTED
+```
 
 ## Fitur MVP
 
-- Autentikasi dan proteksi dashboard pengurus.
-- Manajemen warga/nasabah dan token akses publik.
-- Master jenis sampah, nilai poin per kilogram, dan faktor dampak.
-- Setoran multi-item dengan foto bukti dan snapshot nilai poin.
-- Alur status `DRAFT -> VERIFIED` atau `DRAFT -> REJECTED` dengan audit trail.
-- Ledger kredit, debit, dan reversal sebagai sumber saldo.
-- Penukaran poin dengan pencegahan saldo negatif.
-- Struk publik, QR, dan pesan WhatsApp melalui `wa.me`.
-- Dashboard KPI, tren setoran, komposisi sampah, dan leaderboard RT.
-- Laporan CSV serta metodologi estimasi dampak yang dapat ditelusuri.
+### P0 - Wajib
 
-### Status Implementasi
+- Autentikasi pengurus, RBAC, dan isolasi data organisasi.
+- Profil nasabah bertipe `INDIVIDUAL` atau `UNIT`.
+- Relasi individu-unit tanpa mencampur kepemilikan transaksi.
+- Riwayat, saldo, statistik, terakhir menabung, dan status aktif.
+- Katalog jenis sampah, kondisi, foto, satuan, serta riwayat harga.
+- Pencatatan transaksi multi-item.
+- Impor CSV/XLSX dengan mapping, preview, validasi, dan idempotency.
+- Pilihan `DIRECT_CASH` atau `SAVINGS`.
+- Ledger rupiah append-only.
+- Opening balance untuk migrasi data lama.
+- Penarikan saldo dan bukti penarikan.
+- Nota transaksi dan cetak ulang.
+- Buku tabungan digital melalui token/QR tanpa akun nasabah.
+- Dashboard keaktifan dan rekap per unit.
+- Audit log dan rekonsiliasi saldo.
 
-Daftar fitur di atas merupakan target MVP. Status implementasi repository saat ini adalah:
+### P1 - Jika waktu memungkinkan
 
-- [x] Fondasi database PostgreSQL, index, constraint, trigger, dan RLS.
-- [x] Autentikasi pengurus: login, logout, dan pemeriksaan sesi.
-- [x] Identitas organisasi dan role `ADMIN`, `OPERATOR`, dan `COORDINATOR`.
-- [x] Health check API, Docker Compose, dan CI GitHub Actions.
-- [ ] Manajemen warga/nasabah.
-- [x] Master jenis sampah dan nilai poin per kilogram.
-- [ ] Master faktor dampak lingkungan.
-- [ ] Pencatatan serta verifikasi setoran.
-- [ ] Ledger saldo dan penukaran poin.
-- [ ] Struk publik, QR, dan integrasi WhatsApp.
-- [ ] Dashboard KPI, laporan, dan estimasi dampak.
+- Katalog sampah publik bergambar.
+- Pengingat nasabah yang mendekati status tidak aktif.
+- Ekspor laporan lanjutan.
+- Adjustment saldo terbatas dengan approval dan audit.
+- Form permintaan penjemputan dan status sederhana.
 
-### Pembeda Utama
+### Tidak termasuk MVP
 
-- Warga tidak diwajibkan membuat akun atau memasang aplikasi.
-- Struk dan saldo dapat dibuka dari WhatsApp melalui token acak yang dapat dirotasi.
-- Ledger append-only menjaga saldo tetap dapat direkonsiliasi.
-- Faktor dampak menyimpan rumus, satuan, sumber, dan tanggal akses.
-- Model data disiapkan dengan `organization_id` sebagai fondasi ekspansi multi-tenant.
+- GPS, routing, dan optimasi empat armada.
+- Marketplace atau payment gateway.
+- Aplikasi mobile native.
+- Gamifikasi, poin, badge, dan redemption.
+- Modul pengolahan organik.
+- AI/computer vision untuk klasifikasi sampah.
+- Integrasi otomatis dengan platform pihak ketiga.
 
-## Scope MVP
+## Aturan Bisnis Kritis
 
-MVP berfokus pada satu bank sampah RW. Hal berikut belum termasuk scope:
+- Pengurus, bukan nasabah, mencatat atau mengimpor transaksi.
+- Harga transaksi disimpan sebagai snapshot.
+- Perubahan daftar harga tidak mengubah transaksi lama.
+- `DIRECT_CASH` tidak menambah saldo.
+- `SAVINGS` menghasilkan tepat satu kredit ledger.
+- Saldo dihitung dari agregasi ledger, bukan kolom yang diedit langsung.
+- Penarikan `PAID` menghasilkan tepat satu debit ledger.
+- Saldo negatif ditolak.
+- Transaksi dan mutasi finansial yang selesai tidak dihapus.
+- Koreksi menggunakan `VOID`, `REVERSAL`, dan transaksi pengganti.
+- Individu dan unit harus dapat direkap secara terpisah.
+- Mutasi kritis harus atomik, idempotent, dan memiliki audit trail.
 
-- aplikasi mobile native;
-- marketplace, payment gateway, penjemputan, atau integrasi logistik;
-- klasifikasi sampah otomatis menggunakan AI/computer vision;
-- WhatsApp Business API;
-- multi-tenancy lengkap untuk kampus dan perusahaan;
-- gamifikasi kompleks seperti level, badge, dan misi harian.
+## Model Ledger
+
+Jenis mutasi minimum:
+
+```text
+DEPOSIT
+WITHDRAWAL
+OPENING_BALANCE
+REVERSAL
+ADJUSTMENT
+```
+
+Perhitungan saldo:
+
+```text
+balance = SUM(credit) - SUM(debit)
+```
+
+Contoh:
+
+| Tanggal | Jenis | Referensi | Kredit | Debit | Saldo |
+| --- | --- | --- | ---: | ---: | ---: |
+| 18 Agustus | Setoran | TRX-001 | Rp50.000 | - | Rp50.000 |
+| 25 Agustus | Setoran | TRX-015 | Rp30.000 | - | Rp80.000 |
+| 28 Agustus | Penarikan | WDR-003 | - | Rp25.000 | Rp55.000 |
+
+## Katalog dan Harga
+
+Daftar harga lapangan berlaku per 1 Agustus 2026 dan tertulis dapat berubah sewaktu-waktu. Foto sumber memperlihatkan lebih dari satu kolom harga, termasuk kolom `DITABUNG` dan kolom berlabel `U/LASM` yang maknanya masih harus dikonfirmasi.
+
+Implementasi harus menggunakan harga berversi:
+
+```text
+waste_type
+price_scheme
+price_per_kg
+effective_from
+effective_until
+```
+
+Contoh lapangan, bukan konstanta aplikasi:
+
+| Jenis | U/LASM | Ditabung |
+| --- | ---: | ---: |
+| Ember campur | Rp1.000/kg | Rp1.700/kg |
+| PET bersih | Rp3.000/kg | Rp5.000/kg |
+| PET kotor | Rp2.300/kg | Rp2.500/kg |
+| PET warna | Rp500/kg | Rp800/kg |
+| PP/plastik bening | Rp600/kg | Rp1.000/kg |
+
+## Domain Model
+
+Entitas utama yang direkomendasikan:
+
+```text
+organizations
+profiles
+members
+member_relationships
+waste_types
+waste_price_versions
+transactions
+transaction_items
+ledger_entries
+withdrawals
+receipts
+import_batches
+pickup_requests
+audit_logs
+```
+
+Relasi ringkas:
+
+```text
+organization
+  +-- profiles
+  +-- members (INDIVIDUAL | UNIT)
+  |     +-- transactions
+  |     +-- ledger_entries
+  |     +-- withdrawals
+  +-- waste_types
+        +-- waste_price_versions
+```
+
+## Status Domain
+
+### Transaction
+
+```text
+DRAFT -> FINALIZED -> COMPLETED
+  |          |
+  +----------+-> CANCELLED
+COMPLETED -> VOIDED + replacement transaction
+```
+
+### Withdrawal
+
+```text
+REQUESTED -> APPROVED -> PAID
+         \-> REJECTED
+```
 
 ## Arsitektur
 
@@ -87,30 +257,30 @@ MVP berfokus pada satu bank sampah RW. Hal berikut belum termasuk scope:
 Browser
    |
    v
-ep-fe (Next.js App Router, port 3000)
+ep-fe - Next.js App Router
    |
-   | HTTPS / JSON
+   | HTTPS / JSON / secure cookie
    v
-ep-be (Next.js Route Handlers/Server Actions, port 3001)
+ep-be - Next.js API
    |
    +--> Supabase Auth
    +--> Supabase PostgreSQL + RLS
    +--> Supabase Storage
 ```
 
-Repository memisahkan frontend dan backend sebagai dua deployment unit, tetapi keduanya menggunakan Next.js dan TypeScript.
+Repository memisahkan frontend dan backend sebagai deployment unit:
 
 ```text
 .
-├── .github/workflows/ci.yml  # Quality gate dan container build
-├── compose.yml               # Orkestrasi container FE dan BE
-├── ep-fe/                    # Next.js frontend
-│   ├── src/app/
-│   └── Dockerfile
-└── ep-be/                    # Next.js backend/API
-    ├── prisma/
-    ├── src/app/
-    └── Dockerfile
+â”œâ”€â”€ .github/workflows/ci.yml
+â”œâ”€â”€ compose.yml
+â”œâ”€â”€ ep-fe/
+â”‚   â”œâ”€â”€ src/app/
+â”‚   â””â”€â”€ Dockerfile
+â””â”€â”€ ep-be/
+    â”œâ”€â”€ prisma/
+    â”œâ”€â”€ src/app/
+    â””â”€â”€ Dockerfile
 ```
 
 ## Teknologi
@@ -122,8 +292,23 @@ Repository memisahkan frontend dan backend sebagai dua deployment unit, tetapi k
 | Backend/API | Next.js App Router, Route Handlers, Server Actions |
 | Database | Supabase PostgreSQL, Prisma ORM |
 | Auth dan storage | Supabase Auth, Supabase Storage |
-| Security | Supabase RLS, JOSE, bcryptjs, server-side validation |
+| Security | RLS, JOSE, bcryptjs, CORS allowlist, security headers, rate limiting |
 | Delivery | Docker Compose, GitHub Actions, Vercel |
+
+## Keamanan Minimum
+
+- HTTPS di production.
+- Session/JWT divalidasi di server dan dikirim melalui HttpOnly secure cookie.
+- CORS menggunakan allowlist origin, bukan wildcard untuk credentialed request.
+- Security headers: CSP, HSTS, `X-Content-Type-Options`, dan frame protection.
+- RBAC dan RLS berdasarkan `organization_id`.
+- Seluruh nominal, harga, saldo, dan role dihitung/divalidasi ulang di server.
+- Ledger menggunakan database transaction, unique constraint, dan idempotency key.
+- Penarikan melakukan pemeriksaan saldo ulang dalam transaksi database.
+- Token publik disimpan dalam bentuk hash dan dapat dicabut.
+- Upload CSV/XLSX dan gambar dibatasi MIME type, ukuran, ekstensi, serta storage path.
+- Secret dan service-role key tidak pernah dikirim ke browser.
+- Audit log tidak menyimpan password, token mentah, atau secret.
 
 ## Menjalankan Secara Lokal
 
@@ -131,18 +316,14 @@ Repository memisahkan frontend dan backend sebagai dua deployment unit, tetapi k
 
 - Node.js `24.12.0`
 - npm `11.6.2`
-- project Supabase dengan PostgreSQL yang dapat diakses
+- Project Supabase dengan PostgreSQL yang dapat diakses
 
-### 1. Clone repository
+### Instalasi
 
 ```bash
 git clone https://github.com/farrasmumtaz/EcoPoin.git
 cd EcoPoin
-```
 
-### 2. Instal dependency
-
-```bash
 cd ep-fe
 npm ci
 
@@ -150,7 +331,7 @@ cd ../ep-be
 npm ci
 ```
 
-### 3. Konfigurasi environment
+### Environment backend
 
 Buat `ep-be/.env`:
 
@@ -163,22 +344,17 @@ DIRECT_URL=postgresql://user:password@host:5432/postgres?sslmode=require
 FRONTEND_URL=http://localhost:3000
 ```
 
+### Environment frontend
+
 Buat `ep-fe/.env.local`:
 
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:3001
 ```
 
-`SUPABASE_SERVICE_ROLE_KEY` hanya boleh tersedia di backend. Jangan gunakan prefix `NEXT_PUBLIC_` untuk secret apa pun.
+`SUPABASE_SERVICE_ROLE_KEY` hanya boleh tersedia di backend. Jangan gunakan prefix `NEXT_PUBLIC_` untuk secret.
 
-`DATABASE_URL` digunakan aplikasi saat runtime. `DIRECT_URL` digunakan Prisma
-untuk migrasi; pada jaringan IPv4 gunakan URL **Session pooler** Supabase port
-`5432`. Password yang mengandung karakter khusus harus di-percent-encode pada
-connection string.
-
-### 4. Terapkan migrasi database
-
-Pastikan project Supabase yang dituju benar sebelum menjalankan migrasi:
+### Migrasi database
 
 ```bash
 cd ep-be
@@ -187,180 +363,112 @@ npx prisma generate
 npx prisma migrate status
 ```
 
-Migration membuat tabel, index, constraint, trigger, dan kebijakan RLS untuk
-fondasi MVP. Untuk verifikasi tambahan, jalankan
-`ep-be/prisma/verify-foundation.sql` melalui Supabase SQL Editor.
+### Development server
 
-### 5. Jalankan aplikasi
-
-Terminal frontend:
+Frontend:
 
 ```bash
 cd ep-fe
 npm run dev
 ```
 
-Terminal backend:
+Backend:
 
 ```bash
 cd ep-be
 npm run dev -- --port 3001
 ```
 
-Akses frontend di `http://localhost:3000` dan backend di `http://localhost:3001`.
-
-## Cara Menggunakan
-
-1. Buka frontend di `http://localhost:3000`.
-2. Login menggunakan akun pengurus yang sudah dibuat di Supabase Auth.
-3. Backend memvalidasi sesi HttpOnly cookie serta membaca `organization_id`
-   dan `role` dari protected `app_metadata`.
-4. Endpoint `GET /api/auth/me` dapat digunakan untuk memastikan identitas,
-   organisasi, dan role pengguna aktif.
-5. Gunakan `POST /api/auth/logout` untuk mengakhiri sesi pada perangkat aktif.
-
-Modul transaksi, dashboard, serta halaman publik masih mengikuti status pada
-bagian **Status Implementasi** dan akan tersedia secara bertahap.
-
-## Menjalankan dengan Docker
-
-Salin konfigurasi environment:
+### Docker
 
 ```bash
 cp .env.docker.example .env
-```
-
-Isi kredensial Supabase pada `.env`, lalu jalankan:
-
-```bash
 docker compose config
 docker compose up --build -d
 docker compose ps
 ```
-
-Port default Docker:
 
 | Service | URL host | Port container |
 | --- | --- | --- |
 | Frontend | `http://localhost:3100` | `3000` |
 | Backend | `http://localhost:3101` | `3001` |
 
-Operasi umum:
-
-```bash
-docker compose logs -f
-docker compose down
-```
-
-## Quality Gate
-
-GitHub Actions berjalan pada push dan pull request ke `main` atau `develop`. Setiap aplikasi melewati:
-
-1. reproducible install dengan `npm ci`;
-2. ESLint;
-3. TypeScript type-check;
-4. test jika script tersedia;
-5. production build;
-6. Docker image build.
-
-Validasi lokal sebelum push:
-
-```bash
-cd ep-fe && npm run lint && npx tsc --noEmit && npm run build
-cd ../ep-be && npm run lint && npx tsc --noEmit && npm run build
-```
-
-## Authentication API
+## API yang Direncanakan
 
 | Method | Endpoint | Keterangan |
 | --- | --- | --- |
-| `POST` | `/api/auth/login` | Login email/password dan membuat sesi HttpOnly cookie |
-| `POST` | `/api/auth/logout` | Mencabut sesi aktif pada perangkat saat ini |
-| `GET` | `/api/auth/me` | Mengembalikan identity, organisasi, dan role pengguna aktif |
+| `POST` | `/api/auth/login` | Login pengurus |
+| `GET` | `/api/members` | Cari individu/unit dan status aktif |
+| `GET` | `/api/members/:id` | Profil, saldo, history, dan statistik |
+| `POST` | `/api/transactions` | Membuat transaksi draft |
+| `POST` | `/api/transactions/:id/finalize` | Mengunci item dan total |
+| `POST` | `/api/transactions/:id/settle` | Menyelesaikan tunai/tabungan |
+| `POST` | `/api/imports` | Mengunggah dan memvalidasi data lama |
+| `GET` | `/api/ledger` | Melihat mutasi terfilter |
+| `POST` | `/api/withdrawals` | Membuat permintaan penarikan |
+| `POST` | `/api/withdrawals/:id/pay` | Membayar dan membuat debit atomik |
+| `GET` | `/api/reports/units` | Rekap unit dan keaktifan |
+| `GET` | `/passbook/:token` | Buku tabungan publik |
 
-Frontend harus mengirim request dengan credentials agar cookie sesi diterima dan dikirim kembali:
+## Status Implementasi
 
-```ts
-await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/me`, {
-  credentials: "include",
-});
+Fondasi repository sebelumnya dibangun untuk sistem poin. Setelah wawancara, domain memerlukan migrasi menuju rupiah, tabungan, dan ledger finansial.
+
+- [x] Fondasi PostgreSQL, constraint, index, trigger, dan RLS.
+- [x] Autentikasi pengurus dan identitas organisasi.
+- [x] Docker Compose, health check, dan CI GitHub Actions.
+- [x] Master awal jenis sampah.
+- [ ] Migrasi `points_per_kg` menjadi harga rupiah berversi dan skema harga.
+- [ ] Profil `INDIVIDUAL` dan `UNIT`.
+- [ ] Transaksi `DIRECT_CASH` dan `SAVINGS`.
+- [ ] Ledger rupiah, opening balance, dan reversal.
+- [ ] Penarikan tabungan.
+- [ ] Impor CSV/XLSX.
+- [ ] Nota dan buku tabungan digital.
+- [ ] Dashboard keaktifan serta rekap unit.
+- [ ] Permintaan penjemputan P1.
+
+## Quality Gate
+
+```bash
+cd ep-fe
+npm run lint
+npx tsc --noEmit
+npm run build
+
+cd ../ep-be
+npm run lint
+npx tsc --noEmit
+npm run build
 ```
 
-Role yang didukung adalah `ADMIN`, `OPERATOR`, dan `COORDINATOR`. Nilai `role` dan `organization_id` disimpan pada Supabase `app_metadata`, bukan `user_metadata`, agar tidak dapat diubah oleh pengguna.
+CI harus menjalankan reproducible install, lint, type-check, test, production build, migration validation, dan Docker image build.
 
-## Waste Type API
-
-Semua endpoint membutuhkan sesi pengurus. Operasi tulis hanya dapat dilakukan
-oleh role `ADMIN`; data selalu dibatasi berdasarkan `organization_id` dari sesi.
-
-| Method | Endpoint | Akses | Keterangan |
-| --- | --- | --- | --- |
-| `GET` | `/api/waste-types` | Semua role | Daftar, pencarian, filter, dan pagination |
-| `POST` | `/api/waste-types` | `ADMIN` | Membuat jenis sampah dan poin/kg |
-| `GET` | `/api/waste-types/:id` | Semua role | Detail jenis sampah |
-| `PATCH` | `/api/waste-types/:id` | `ADMIN` | Memperbarui master data |
-| `DELETE` | `/api/waste-types/:id` | `ADMIN` | Menonaktifkan data (soft-delete) |
-
-Query daftar yang tersedia adalah `category`, `isActive`, `search`, `page`, dan
-`limit`. Nilai `pointsPerKg` dikirim sebagai string desimal pada response untuk
-menjaga presisi data PostgreSQL.
-
-## Aturan Bisnis Kritis
-
-- Setoran `DRAFT` tidak memengaruhi saldo, laporan, leaderboard, atau dampak.
-- Setoran `VERIFIED` menghasilkan tepat satu kredit ledger.
-- Setoran `REJECTED` tidak menghasilkan poin.
-- Saldo dihitung dari agregasi ledger dan tidak dapat diedit langsung.
-- Penukaran ditolak jika saldo tidak mencukupi.
-- Harga dan faktor transaksi disimpan sebagai snapshot.
-- Statistik dan dampak hanya menggunakan setoran terverifikasi.
-- Mutasi kritis harus idempotent dan dijalankan secara atomik.
-
-## Keamanan dan Privasi
-
-- RLS mengisolasi data berdasarkan `organization_id`.
-- Token publik menggunakan nilai acak yang tidak dapat ditebak dan dapat dicabut.
-- Nomor WhatsApp dan data sensitif tidak ditampilkan penuh pada halaman publik.
-- Service role key tidak pernah dikirim ke browser.
-- Validasi, otorisasi, dan perhitungan poin dilakukan ulang di server.
-- Foto dibatasi berdasarkan MIME type, ukuran, dan storage path organisasi.
-- Audit log tidak menyimpan password, token publik, atau secret.
-
-## Kontribusi
-
-Setiap anggota bekerja pada branch masing-masing yang dibuat dari `main`, lalu
-mengajukan pull request ke `main` setelah quality gate lokal lulus. Contoh
-berikut menggunakan branch `farras`:
+## Strategi Branch
 
 ```bash
 git switch main
 git pull --ff-only origin main
-git switch farras
-git merge main
+git switch -c feat/research-driven-domain
 
-# setelah implementasi
+# implementasi dan dokumentasi
 git add .
-git commit -m "feat(scope): deskripsi perubahan"
-git push origin farras
+git commit -m "docs(product): revise scope from field research"
+git push -u origin feat/research-driven-domain
 ```
 
-Alur merge:
+Perubahan domain sebaiknya diajukan melalui pull request dan tidak langsung dipush ke `main`.
 
-```text
-branch anggota -> pull request + review -> main
-```
+## Validasi Sebelum Feature Freeze
 
-Satu fitur dibuat dalam commit yang terfokus. Direct push dan force push ke
-`main` tidak diperbolehkan. CI otomatis berjalan ketika pull request menuju
-`main` dibuat atau diperbarui.
-
-## SDGs
-
-- **SDG 11 - Sustainable Cities and Communities:** membantu komunitas mengelola sampah secara transparan dan berbasis data.
-- **SDG 9 - Industry, Innovation and Infrastructure:** memperluas adopsi infrastruktur digital pada layanan komunitas tingkat RW/RT.
-
-EcoPoin selaras dengan subtema **Smart Sustainable Digital Solution for Inclusive Society** melalui akses warga yang ringan, transparansi operasional, dan pengukuran dampak yang dapat ditelusuri.
+1. Konfirmasi arti kolom `U/LASM` pada daftar harga.
+2. Konfirmasi apakah harga berbeda karena metode tunai/tabungan atau alasan lain.
+3. Konfirmasi aturan masa tunggu penarikan satu minggu.
+4. Konfirmasi definisi nasabah dan unit aktif.
+5. Periksa format file pencatatan laptop untuk desain importer.
+6. Konfirmasi apakah unit mempunyai satu rekening atau beberapa rekening anggota.
+7. Baca empat rekaman wawancara lain sebelum mengunci scope.
 
 ## Tim
 
-EcoPoin dikembangkan oleh tim mahasiswa beranggotakan tiga orang untuk ITechno Cup 2026.
+EcoPoin dikembangkan oleh tim mahasiswa untuk kategori Web Development ITechno Cup 2026.
