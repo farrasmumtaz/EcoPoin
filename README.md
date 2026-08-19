@@ -399,7 +399,10 @@ docker compose ps
 | --- | --- | --- |
 | `POST` | `/api/auth/login` | Login pengurus |
 | `GET` | `/api/members` | Cari individu/unit dan status aktif |
-| `GET` | `/api/members/:id` | Profil, saldo, history, dan statistik |
+| `POST` | `/api/members` | Membuat profil individu/unit dan nomor unik |
+| `GET` | `/api/members/:id` | Detail profil dan relasi unit |
+| `PATCH` | `/api/members/:id` | Memperbarui profil atau relasi unit |
+| `DELETE` | `/api/members/:id` | Menonaktifkan profil tanpa menghapus history |
 | `POST` | `/api/transactions` | Membuat transaksi draft |
 | `POST` | `/api/transactions/:id/finalize` | Mengunci item dan total |
 | `POST` | `/api/transactions/:id/settle` | Menyelesaikan tunai/tabungan |
@@ -410,6 +413,12 @@ docker compose ps
 | `GET` | `/api/reports/units` | Rekap unit dan keaktifan |
 | `GET` | `/passbook/:token` | Buku tabungan publik |
 
+Filter daftar nasabah yang tersedia: `search`, `type`, `unitId`, `isActive`,
+`page`, dan `limit`. Nomor nasabah dibuat oleh backend. Field `picName` wajib
+untuk tipe `UNIT`, sedangkan `unitIds` hanya digunakan untuk menghubungkan
+profil `INDIVIDUAL` ke satu atau beberapa unit. Saldo, transaksi, dan mutasi
+belum dikembalikan oleh detail profil sampai migrasi domain finansial v3 selesai.
+
 ## Status Implementasi
 
 Fondasi repository sebelumnya dibangun untuk sistem poin. Setelah wawancara, domain memerlukan migrasi menuju rupiah, tabungan, dan ledger finansial.
@@ -419,7 +428,7 @@ Fondasi repository sebelumnya dibangun untuk sistem poin. Setelah wawancara, dom
 - [x] Docker Compose, health check, dan CI GitHub Actions.
 - [x] Master awal jenis sampah.
 - [ ] Migrasi `points_per_kg` menjadi harga rupiah berversi dan skema harga.
-- [ ] Profil `INDIVIDUAL` dan `UNIT`.
+- [x] Profil `INDIVIDUAL` dan `UNIT`, relasi unit, filter, dan soft-delete.
 - [ ] Transaksi `DIRECT_CASH` dan `SAVINGS`.
 - [ ] Ledger rupiah, opening balance, dan reversal.
 - [ ] Penarikan tabungan.
