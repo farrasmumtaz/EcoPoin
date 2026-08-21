@@ -455,18 +455,29 @@ CI harus menjalankan reproducible install, lint, type-check, test, production bu
 
 ## Strategi Branch
 
+Alur integrasi tim:
+
+```text
+branch anggota -> pull request ke dev -> testing/review -> pull request dev ke main
+```
+
+Setiap anggota membuat branch dari `dev` terbaru:
+
 ```bash
-git switch main
-git pull --ff-only origin main
-git switch -c feat/research-driven-domain
+git fetch origin
+git switch dev
+git pull --ff-only origin dev
+git switch -c feat/nama-fitur
 
 # implementasi dan dokumentasi
 git add .
-git commit -m "docs(product): revise scope from field research"
-git push -u origin feat/research-driven-domain
+git commit -m "feat(scope): deskripsi perubahan"
+git push -u origin feat/nama-fitur
 ```
 
-Perubahan domain sebaiknya diajukan melalui pull request dan tidak langsung dipush ke `main`.
+Branch anggota tidak langsung masuk ke `main`. Setelah CI dan review pada pull
+request menuju `dev` berhasil, perubahan digabungkan ke `dev`. Branch `main`
+hanya menerima pull request dari `dev` untuk versi yang sudah diuji bersama.
 
 ## Validasi Sebelum Feature Freeze
 
