@@ -20,7 +20,7 @@ export default function LoginPage() {
     try {
       e.preventDefault();
       setLoading(true);
-      // const data = await authUser(email, password); 
+      // const data = await authUser(email, password);
       toast.success(`Selamat datang`);
       router.push("/dashboard");
     } catch (e) {
@@ -37,28 +37,13 @@ export default function LoginPage() {
         <div className="hidden md:flex relative w-1/2">
           <Image
             src={loginAsset}
+            loading="eager"
             alt="Aerial view of forest canopy"
             fill
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             className="object-cover"
           />
           <div className="absolute inset-0 bg-black/10" />
-
-          {/* Recycle icon */}
-          <div className="relative z-10 flex-1 flex items-center justify-center">
-            <svg
-              className="w-40 h-40 xl:w-48 xl:h-48 text-white"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={1.5}
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5m9.75-11.396v5.714a2.25 2.25 0 00.659 1.591L19.5 14.5M5.106 18.75h13.788a2.25 2.25 0 001.994-3.286l-1.694-3.28M8.288 15.464L5.106 18.75m0 0-1.5-3M18.894 15.464l3.182 3.286m0 0 1.5-3"
-              />
-            </svg>
-          </div>
 
           {/* Quote overlay */}
           <div className="absolute bottom-0 left-0 right-0 z-10 p-10 text-white">
