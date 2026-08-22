@@ -1,0 +1,178 @@
+{
+  "info": {
+    "name": "EcoPoin — Phase 3 (Verifikasi, Ledger, Redemption, Passbook)",
+    "description": "Auth is cookie-based (Supabase SSR session), not a bearer token. Run 'Login' first with Postman's cookie jar enabled (default) and every later request in this collection will carry the session cookie automatically. 'Get Passbook (public)' is the only request that needs no login. Set the `base_url` variable to wherever `ep-be` is running (docker compose default: http://localhost:3101).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:3101" },
+    { "key": "member_id", "value": "" },
+    { "key": "deposit_id", "value": "" },
+    { "key": "redemption_id", "value": "" },
+    { "key": "passbook_token", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"you@example.com\",\n  \"password\": \"your-password\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/api/auth/login", "host": ["{{base_url}}"], "path": ["api", "auth", "login"] }
+          }
+        },
+        {
+          "name": "Me",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/auth/me", "host": ["{{base_url}}"], "path": ["api", "auth", "me"] }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/auth/logout", "host": ["{{base_url}}"], "path": ["api", "auth", "logout"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Deposits",
+      "item": [
+        {
+          "name": "List Deposits",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/deposits?status=DRAFT",
+              "host": ["{{base_url}}"],
+              "path": ["api", "deposits"],
+              "query": [{ "key": "status", "value": "DRAFT" }]
+            }
+          }
+        },
+        {
+          "name": "Get Deposit",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/deposits/{{deposit_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "deposits", "{{deposit_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Verify Deposit",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/api/deposits/{{deposit_id}}/verify",
+              "host": ["{{base_url}}"],
+              "path": ["api", "deposits", "{{deposit_id}}", "verify"]
+            }
+          }
+        },
+        {
+          "name": "Reject Deposit",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"reason\": \"Foto tidak sesuai jenis sampah yang dicatat.\"\n}" },
+            "url": {
+              "raw": "{{base_url}}/api/deposits/{{deposit_id}}/reject",
+              "host": ["{{base_url}}"],
+              "path": ["api", "deposits", "{{deposit_id}}", "reject"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Ledger",
+      "item": [
+        {
+          "name": "List Ledger Entries",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/ledger?memberId={{member_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ledger"],
+              "query": [{ "key": "memberId", "value": "{{member_id}}" }]
+            }
+          }
+        },
+        {
+          "name": "Get Member Balance",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/members/{{member_id}}/balance",
+              "host": ["{{base_url}}"],
+              "path": ["api", "members", "{{member_id}}", "balance"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Redemptions",
+      "item": [
+        {
+          "name": "List Redemptions",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/redemptions", "host": ["{{base_url}}"], "path": ["api", "redemptions"] }
+          }
+        },
+        {
+          "name": "Get Redemption",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/redemptions/{{redemption_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "redemptions", "{{redemption_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Create Redemption",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"memberId\": \"{{member_id}}\",\n  \"points\": 10,\n  \"redemptionType\": \"Sembako\",\n  \"notes\": \"Ditukar di kantor RW\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/api/redemptions", "host": ["{{base_url}}"], "path": ["api", "redemptions"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Passbook (public, no login)",
+      "item": [
+        {
+          "name": "Get Passbook",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/passbook/{{passbook_token}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "passbook", "{{passbook_token}}"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
