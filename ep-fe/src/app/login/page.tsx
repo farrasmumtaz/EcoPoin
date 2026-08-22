@@ -1,16 +1,38 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import loginAsset from "../../assets/login_assets.jpg";
+import { useRouter } from "next/navigation";
+import { authUser } from "../services/auth/authUser";
+import { CircularProgress } from "@mui/material";
+import toast from "react-hot-toast";
 
 export default function LoginPage() {
+  const router = useRouter();
+  const [email, setEmail] = useState();
+  const [password, setPassowrd] = useState();
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setLoading] = useState(false);
+
+  const handleLogin = async (e: React.SubmitEvent) => {
+    try {
+      e.preventDefault();
+      setLoading(true);
+      // const data = await authUser(email, password); 
+      toast.success(`Selamat datang`);
+      router.push("/dashboard");
+    } catch (e) {
+      toast.error(`${e}`);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="h-screen w-full bg-neutral-800 flex items-center justify-center p-6">
-      <div className="w-[92vw] h-[95vh] max-w-[1400px] max-h-[940px] bg-white rounded-2xl shadow-xl overflow-hidden flex">
+      <div className="w-[92vw] h-[95vh] max-w-350 max-h-235 bg-white rounded-2xl shadow-xl overflow-hidden flex">
         {/* Left panel — image */}
         <div className="hidden md:flex relative w-1/2">
           <Image
@@ -42,7 +64,8 @@ export default function LoginPage() {
           <div className="absolute bottom-0 left-0 right-0 z-10 p-10 text-white">
             <p className="font-semibold mb-2 text-lg">Robert Swan</p>
             <p className="text-base text-white/90 leading-relaxed">
-              &ldquo;emphasizes individual accountability, noting that relying on others to save the planet is the greatest threat.&rdquo;
+              &ldquo;emphasizes individual accountability, noting that relying
+              on others to save the planet is the greatest threat.&rdquo;
             </p>
           </div>
         </div>
@@ -60,7 +83,7 @@ export default function LoginPage() {
             Isi email dan password untuk mengakses akun anda!
           </p>
 
-          <form className="space-y-6">
+          <form className="space-y-6" onSubmit={handleLogin}>
             <div>
               <label
                 htmlFor="email"
@@ -117,7 +140,7 @@ export default function LoginPage() {
               type="submit"
               className="w-full bg-primary/75 hover:bg-primary text-white font-semibold text-base py-4 rounded-lg transition duration-300 cursor-pointer"
             >
-              Masuk
+              {isLoading ? <CircularProgress></CircularProgress> : <p>Masuk</p>}
             </button>
           </form>
         </div>
