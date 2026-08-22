@@ -123,7 +123,7 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              className="w-full bg-primary/75 hover:bg-primary text-white font-semibold text-base py-4 rounded-lg transition duration-300 cursor-pointer"
+              className="w-full bg-primary hover:bg-primary/75 text-white font-semibold text-base py-4 rounded-lg transition duration-300 cursor-pointer"
             >
               {isLoading ? <CircularProgress></CircularProgress> : <p>Masuk</p>}
             </button>
