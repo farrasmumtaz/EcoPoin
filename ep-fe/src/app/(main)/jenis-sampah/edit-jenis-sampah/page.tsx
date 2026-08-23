@@ -1,8 +1,8 @@
 "use client";
 
 import { ChevronDown } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useState, FormEvent } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState, useMemo, FormEvent, Suspense } from "react";
 
 interface FormFieldLabelProps {
   children: React.ReactNode;
@@ -17,23 +17,39 @@ function FormFieldLabel({ children }: FormFieldLabelProps) {
 // ---------- Static options (replace with real data / API calls) ----------
 const kategoriOptions = ["Organik", "Anorganik", "B3"];
 
-export default function TambahJenisSampah() {
-  const [namaJenisSampah, setNamaJenisSampah] = useState("");
-  const [kategori, setKategori] = useState("");
-  const [satuanUnit, setSatuanUnit] = useState("");
-  const [hargaPerKg, setHargaPerKg] = useState("");
+function EditJenisSampahForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Snapshot of the data passed in via query params from the Jenis Sampah
+  // table. "Ulang" restores the form to this snapshot instead of clearing it.
+  const originalData = useMemo(
+    () => ({
+      namaJenisSampah: searchParams.get("nama") ?? "",
+      kategori: searchParams.get("kategori") ?? "",
+      satuanUnit: searchParams.get("satuan") ?? "",
+      hargaPerKg: searchParams.get("hargaPerKg") ?? "",
+    }),
+    [searchParams],
+  );
+
+  const [namaJenisSampah, setNamaJenisSampah] = useState(
+    originalData.namaJenisSampah,
+  );
+  const [kategori, setKategori] = useState(originalData.kategori);
+  const [satuanUnit, setSatuanUnit] = useState(originalData.satuanUnit);
+  const [hargaPerKg, setHargaPerKg] = useState(originalData.hargaPerKg);
 
   const resetForm = () => {
-    setNamaJenisSampah("");
-    setKategori("");
-    setSatuanUnit("");
-    setHargaPerKg("");
+    setNamaJenisSampah(originalData.namaJenisSampah);
+    setKategori(originalData.kategori);
+    setSatuanUnit(originalData.satuanUnit);
+    setHargaPerKg(originalData.hargaPerKg);
   };
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    // TODO: call API to persist jenis sampah data
+    // TODO: call API to persist updated jenis sampah data
     console.log({ namaJenisSampah, kategori, satuanUnit, hargaPerKg });
   };
 
@@ -111,7 +127,7 @@ export default function TambahJenisSampah() {
           <button
             type="button"
             onClick={() => router.back()}
-            className="rounded-md bg-placeholder px-8 py-3 font-semibold text-white transition hover:opacity-75 cursor-pointer duration-300 "
+            className="rounded-md bg-placeholder px-8 py-3 font-semibold text-white transition hover:opacity-75 cursor-pointer duration-300"
           >
             Kembali
           </button>
@@ -131,5 +147,16 @@ export default function TambahJenisSampah() {
         </div>
       </form>
     </div>
+  );
+}
+
+// useSearchParams() opts the tree into client-side rendering unless wrapped
+// in Suspense, so the actual page default-exports a Suspense boundary
+// around the form rather than using useSearchParams directly here.
+export default function EditJenisSampah() {
+  return (
+    <Suspense fallback={null}>
+      <EditJenisSampahForm />
+    </Suspense>
   );
 }
