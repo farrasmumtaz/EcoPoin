@@ -38,6 +38,16 @@ export default function DataWarga() {
     currentPage * PAGE_SIZE,
   );
 
+  const goToEditWarga = (warga: Warga) => {
+    const params = new URLSearchParams({
+      nomorNasabah: warga.nomorNasabah,
+      nama: warga.nama,
+      rt: warga.rt,
+      noTelp: warga.noTelp,
+    });
+    router.push(`/data-warga/edit-warga?${params.toString()}`);
+  };
+
   return (
     <div className="flex h-full flex-col overflow-hidden bg-gray-50 p-6">
       {/* Search + Add button */}
@@ -96,6 +106,7 @@ export default function DataWarga() {
                     <div className="flex justify-end">
                       <button
                         aria-label={`Lihat ${warga.nama}`}
+                        onClick={() => goToEditWarga(warga)}
                         className="flex h-8 w-9 items-center justify-center rounded-md border border-gray-300 text-font transition hover:border-primary hover:text-primary duration-300 cursor-pointer"
                       >
                         <Eye size={15} />
