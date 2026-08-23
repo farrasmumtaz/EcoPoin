@@ -95,7 +95,7 @@ export default function Sidebar() {
                 return (
                   <button
                     key={href}
-                    onClick={() => router.push(href)}
+                    onClick={() => router.replace(href)}
                     className={`w-full flex items-center gap-3 py-3 rounded-xl transition duration-200 cursor-pointer ${
                       collapsed ? "justify-center px-0" : "px-4"
                     } ${
