@@ -62,7 +62,7 @@ export default function Sidebar() {
         }`}
       >
         {!collapsed && (
-          <h1 className="text-green-700 font-extrabold text-xl tracking-wide">
+          <h1 className="text-primary font-bold text-xl tracking-wide">
             ECOPOIN
           </h1>
         )}
@@ -100,7 +100,7 @@ export default function Sidebar() {
                       collapsed ? "justify-center px-0" : "px-4"
                     } ${
                       isActive
-                        ? "bg-green-700 text-white font-semibold"
+                        ? "bg-primary text-white font-semibold"
                         : "text-neutral-800 hover:bg-neutral-100"
                     }`}
                   >
@@ -145,7 +145,7 @@ export default function Sidebar() {
               className="w-10 h-10 rounded-full object-cover"
             />
             <button
-              onClick={() => router.push("/login")}
+              onClick={() => router.replace("/login")}
               className="w-9 h-9 flex items-center justify-center rounded-lg bg-neutral-900 text-white hover:bg-neutral-700 transition cursor-pointer"
               aria-label="Logout"
             >
