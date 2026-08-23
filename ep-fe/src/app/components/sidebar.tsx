@@ -118,17 +118,23 @@ export default function Sidebar() {
       <div className="px-4 py-5">
         {!collapsed ? (
           <div className="flex items-center gap-3 border border-neutral-200 rounded-xl p-3">
-            <img
-              src="/avatar-placeholder.jpg"
-              alt="User avatar"
-              className="w-10 h-10 rounded-full object-cover shrink-0"
-            />
-            <div className="flex-1 min-w-0">
-              <p className="text-xs text-neutral-500 leading-tight">RT.2</p>
-              <p className="text-sm font-semibold text-neutral-800 leading-tight truncate">
-                Hj. Kimi
-              </p>
-            </div>
+            <button
+              onClick={() => router.push("/profil")}
+              className="flex flex-1 items-center gap-3 min-w-0 cursor-pointer text-left"
+              aria-label="Lihat profil"
+            >
+              <img
+                src="/avatar-placeholder.jpg"
+                alt="User avatar"
+                className="w-10 h-10 rounded-full object-cover shrink-0"
+              />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-neutral-500 leading-tight">RT.2</p>
+                <p className="text-sm font-semibold text-neutral-800 leading-tight truncate">
+                  Hj. Kimi
+                </p>
+              </div>
+            </button>
             <button
               onClick={() => router.push("/login")}
               className="w-8 h-8 flex items-center justify-center rounded-lg bg-neutral-900 text-white hover:bg-neutral-700 transition cursor-pointer shrink-0"
@@ -139,11 +145,17 @@ export default function Sidebar() {
           </div>
         ) : (
           <div className="flex flex-col items-center gap-4">
-            <img
-              src="/avatar-placeholder.jpg"
-              alt="User avatar"
-              className="w-10 h-10 rounded-full object-cover"
-            />
+            <button
+              onClick={() => router.push("/profil")}
+              className="cursor-pointer"
+              aria-label="Lihat profil"
+            >
+              <img
+                src="/avatar-placeholder.jpg"
+                alt="User avatar"
+                className="w-10 h-10 rounded-full object-cover"
+              />
+            </button>
             <button
               onClick={() => router.replace("/login")}
               className="w-9 h-9 flex items-center justify-center rounded-lg bg-neutral-900 text-white hover:bg-neutral-700 transition cursor-pointer"
