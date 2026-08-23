@@ -3,6 +3,7 @@
 .env.*.local
 !.env.example
 !.env.docker.example
+!**/.env.example
 
 node_modules/
 .next/

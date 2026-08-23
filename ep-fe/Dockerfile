@@ -6,7 +6,7 @@ RUN npm ci
 FROM node:24.12.0-alpine AS builder
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
-ARG NEXT_PUBLIC_API_URL=http://localhost:3001
+ARG NEXT_PUBLIC_API_URL=http://localhost:3001/api
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .
