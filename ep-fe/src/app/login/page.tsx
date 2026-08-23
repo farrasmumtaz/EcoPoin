@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import loginAsset from "../../assets/login_assets.jpg";
 import { useRouter } from "next/navigation";
@@ -11,8 +11,8 @@ import toast from "react-hot-toast";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState();
-  const [password, setPassowrd] = useState();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setLoading] = useState(false);
 
@@ -20,7 +20,7 @@ export default function LoginPage() {
     try {
       e.preventDefault();
       setLoading(true);
-      // const data = await authUser(email, password);
+      await authUser(email, password);
       toast.success(`Selamat datang`);
       router.push("/dashboard");
     } catch (e) {
@@ -79,6 +79,10 @@ export default function LoginPage() {
               <input
                 type="email"
                 id="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                autoComplete="email"
+                required
                 placeholder="Isi email anda"
                 className="w-full px-5 py-3.5 rounded-lg bg-placeholder/50 border border-transparent text-base text-font placeholder:text-font/50 focus:outline-none focus:ring-2 focus:ring-green-600 focus:bg-white transition duration-300 focus:text-font"
               />
@@ -94,6 +98,11 @@ export default function LoginPage() {
                 <input
                   type={showPassword ? "text" : "password"}
                   id="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  autoComplete="current-password"
+                  minLength={8}
+                  required
                   placeholder="Isi password anda"
                   className="w-full px-5 py-3.5 rounded-lg text-font bg-placeholder/50 border border-transparent text-base placeholder:text-font/50 focus:outline-none focus:ring-2 focus:ring-green-600 focus:bg-white transition duration-300 focus:text-font"
                 />
@@ -123,6 +132,7 @@ export default function LoginPage() {
 
             <button
               type="submit"
+              disabled={isLoading}
               className="w-full bg-primary hover:bg-primary/75 text-white font-semibold text-base py-4 rounded-lg transition duration-300 cursor-pointer"
             >
               {isLoading ? <CircularProgress></CircularProgress> : <p>Masuk</p>}

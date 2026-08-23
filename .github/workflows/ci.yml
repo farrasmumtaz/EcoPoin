@@ -72,6 +72,7 @@ jobs:
         run: npm run build
         env:
           NEXT_TELEMETRY_DISABLED: "1"
+          NEXT_PUBLIC_API_URL: http://localhost:3101/api
 
   container:
     name: ${{ matrix.app }} container

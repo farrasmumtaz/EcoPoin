@@ -14,9 +14,13 @@ function applyCorsHeaders(response: NextResponse, origin: string): void {
 }
 
 export function proxy(request: NextRequest): NextResponse {
-  const { FRONTEND_URL } = getServerEnv();
+  const { FRONTEND_URL, FRONTEND_URLS } = getServerEnv();
+  const allowedOrigins = new Set([
+    FRONTEND_URL,
+    ...(FRONTEND_URLS?.split(",").map((value) => value.trim()) ?? []),
+  ]);
   const origin = request.headers.get("origin");
-  const isAllowedOrigin = origin === FRONTEND_URL;
+  const isAllowedOrigin = origin !== null && allowedOrigins.has(origin);
 
   if (request.method === "OPTIONS") {
     if (!origin || !isAllowedOrigin) {

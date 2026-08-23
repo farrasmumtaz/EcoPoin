@@ -1,7 +1,7 @@
 "use client";
 
 import { Users, Home, Phone, Camera } from "lucide-react";
-import { useState, useEffect, useRef, FormEvent } from "react";
+import { useState, useEffect, useMemo, useRef, FormEvent } from "react";
 
 interface FormFieldLabelProps {
   icon?: React.ReactNode;
@@ -34,20 +34,18 @@ export default function Profile() {
 
   // Draft photo — only held in memory until the form is submitted.
   const [fotoFile, setFotoFile] = useState<File | null>(null);
-  const [fotoPreviewUrl, setFotoPreviewUrl] = useState(initialProfile.fotoUrl);
   const fotoInputRef = useRef<HTMLInputElement>(null);
+  const fotoPreviewUrl = useMemo(
+    () => (fotoFile ? URL.createObjectURL(fotoFile) : initialProfile.fotoUrl),
+    [fotoFile],
+  );
 
   // Build/revoke an object URL whenever a new draft photo is picked, so we
   // preview the selected file without uploading anything yet.
   useEffect(() => {
-    if (!fotoFile) {
-      setFotoPreviewUrl(initialProfile.fotoUrl);
-      return;
-    }
-    const objectUrl = URL.createObjectURL(fotoFile);
-    setFotoPreviewUrl(objectUrl);
-    return () => URL.revokeObjectURL(objectUrl);
-  }, [fotoFile]);
+    if (!fotoFile) return;
+    return () => URL.revokeObjectURL(fotoPreviewUrl);
+  }, [fotoFile, fotoPreviewUrl]);
 
   const handleFotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] ?? null;
