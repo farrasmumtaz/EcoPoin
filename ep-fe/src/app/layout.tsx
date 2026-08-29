@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import type { ReactNode } from "react";
 import "./globals.css";
 import { Toaster } from "react-hot-toast";
+import { AuthInitializer } from "@/app/components/authInitializer"; // adjust to your actual path
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,6 +32,8 @@ export default function RootLayout({ children }: RootLayoutProps) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        {/* Renders nothing — kicks off the /auth/me session check once on app load */}
+        <AuthInitializer />
         {children}
         <Toaster
           position="top-right"

@@ -1,34 +1,53 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import loginAsset from "../../assets/login_assets.jpg";
 import { useRouter } from "next/navigation";
 import { authUser } from "../services/auth/authUser";
+import { useAuthStore } from "@/app/services/auth/authStore"; 
 import { CircularProgress } from "@mui/material";
 import toast from "react-hot-toast";
 
 export default function LoginPage() {
   const router = useRouter();
+  const setUser = useAuthStore((s) => s.setUser);
+  const user = useAuthStore((s) => s.user);
+  const isInitializing = useAuthStore((s) => s.isInitializing);
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setLoading] = useState(false);
 
-  const handleLogin = async (e: React.SubmitEvent) => {
+  // If a valid session already exists (checked by AuthInitializer on app
+  // load), skip the login form entirely and go straight to the dashboard.
+  useEffect(() => {
+    if (isInitializing) return;
+    if (user) router.replace("/dashboard");
+  }, [isInitializing, user, router]);
+
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
     try {
-      e.preventDefault();
       setLoading(true);
-      await authUser(email, password);
-      toast.success(`Selamat datang`);
+      const data = await authUser(email, password);
+      setUser(data); // populate the global store, not just show a toast
+      toast.success(`Selamat datang, ${data.email}`);
       router.push("/dashboard");
-    } catch (e) {
-      toast.error(`${e}`);
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Terjadi kesalahan, silakan coba lagi.",
+      );
     } finally {
       setLoading(false);
     }
   };
+
+  // Avoid flashing the login form for a split second while we're still
+  // checking whether a session already exists.
+  if (isInitializing || user) return null;
 
   return (
     <div className="h-screen w-full bg-neutral-800 flex items-center justify-center p-6">

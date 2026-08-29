@@ -2,50 +2,80 @@
 
 import { Search, Plus, Eye } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import toast from "react-hot-toast";
 
-// ---------- Types ----------
-interface Warga {
-  nomorNasabah: string;
-  nama: string;
-  rt: string;
-  noTelp: string;
-}
+import { getMembers } from "@/app/services/members/members"; // adjust to your actual path
 
-// ---------- Static data (replace with real data / API calls) ----------
 const PAGE_SIZE = 9;
-const totalPages = 10;
-
-const wargaData: Warga[] = Array.from(
-  { length: PAGE_SIZE * totalPages },
-  () => ({
-    nomorNasabah: "122234456",
-    nama: "Asep Wahyudi",
-    rt: "RT 2",
-    noTelp: "08991232134",
-  }),
-);
-
-const visiblePages = [1, 2, 3, 4, 5, 6, 7];
 
 export default function DataWarga() {
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+
+  const [items, setItems] = useState<
+    { id: string; memberNumber: string; fullName: string; rt: string | null; phone: string | null }[]
+  >([]);
+  const [totalPages, setTotalPages] = useState(1);
+  const [isLoading, setIsLoading] = useState(true);
+
   const router = useRouter();
 
-  const pagedWarga = wargaData.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE,
-  );
+  // Debounce search input so we don't fire a request on every keystroke.
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setDebouncedSearch(search);
+      setCurrentPage(1); // reset to page 1 whenever the search term changes
+    }, 400);
+    return () => clearTimeout(timeout);
+  }, [search]);
 
-  const goToEditWarga = (warga: Warga) => {
-    const params = new URLSearchParams({
-      nomorNasabah: warga.nomorNasabah,
-      nama: warga.nama,
-      rt: warga.rt,
-      noTelp: warga.noTelp,
-    });
-    router.push(`/data-warga/edit-warga?${params.toString()}`);
+  // Fetch whenever the page or debounced search term changes.
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchMembers() {
+      try {
+        setIsLoading(true);
+        const { items, pagination } = await getMembers({
+          page: currentPage,
+          limit: PAGE_SIZE,
+          search: debouncedSearch || undefined,
+          type: "INDIVIDUAL",
+        });
+        if (cancelled) return;
+        setItems(items);
+        setTotalPages(pagination.totalPages || 1);
+      } catch (err) {
+        if (cancelled) return;
+        toast.error(
+          err instanceof Error ? err.message : "Gagal memuat data warga.",
+        );
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    }
+
+    fetchMembers();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentPage, debouncedSearch]);
+
+  // Build a bounded window of page numbers around the current page instead
+  // of a hardcoded 1–7, since totalPages now comes from the API and can be
+  // smaller or much larger than 7.
+  const visiblePages = useMemo(() => {
+    const windowSize = 7;
+    let start = Math.max(1, currentPage - Math.floor(windowSize / 2));
+    const end = Math.min(totalPages, start + windowSize - 1);
+    start = Math.max(1, end - windowSize + 1);
+    return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+  }, [currentPage, totalPages]);
+
+  const goToEditWarga = (member: (typeof items)[number]) => {
+    router.push(`/data-warga/edit-warga?id=${encodeURIComponent(member.id)}`);
   };
 
   return (
@@ -88,39 +118,57 @@ export default function DataWarga() {
               </tr>
             </thead>
             <tbody>
-              {pagedWarga.map((warga, i) => (
-                <tr key={i} className="border-b border-gray-100 last:border-0">
-                  <td className="px-6 py-4 font-semibold text-font">
-                    {warga.nomorNasabah}
-                  </td>
-                  <td className="px-6 py-4 text-center font-semibold text-font">
-                    {warga.nama}
-                  </td>
-                  <td className="px-6 py-4 text-center font-semibold text-font">
-                    {warga.rt}
-                  </td>
-                  <td className="px-6 py-4 text-center font-semibold text-font">
-                    {warga.noTelp}
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex justify-end">
-                      <button
-                        aria-label={`Lihat ${warga.nama}`}
-                        onClick={() => goToEditWarga(warga)}
-                        className="flex h-8 w-9 items-center justify-center rounded-md border border-gray-300 text-font transition hover:border-primary hover:text-primary duration-300 cursor-pointer"
-                      >
-                        <Eye size={15} />
-                      </button>
-                    </div>
+              {isLoading ? (
+                <tr>
+                  <td colSpan={5} className="px-6 py-10 text-center text-font/60">
+                    Memuat data...
                   </td>
                 </tr>
-              ))}
+              ) : items.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-6 py-10 text-center text-font/60">
+                    Tidak ada data warga.
+                  </td>
+                </tr>
+              ) : (
+                items.map((member) => (
+                  <tr
+                    key={member.id}
+                    className="border-b border-gray-100 last:border-0"
+                  >
+                    <td className="px-6 py-4 font-semibold text-font">
+                      {member.memberNumber}
+                    </td>
+                    <td className="px-6 py-4 text-center font-semibold text-font">
+                      {member.fullName}
+                    </td>
+                    <td className="px-6 py-4 text-center font-semibold text-font">
+                      {member.rt ?? "-"}
+                    </td>
+                    <td className="px-6 py-4 text-center font-semibold text-font">
+                      {member.phone ?? "-"}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex justify-end">
+                        <button
+                          aria-label={`Lihat ${member.fullName}`}
+                          onClick={() => goToEditWarga(member)}
+                          className="flex h-8 w-9 items-center justify-center rounded-md border border-gray-300 text-font transition hover:border-primary hover:text-primary duration-300 cursor-pointer"
+                        >
+                          <Eye size={15} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
 
         {/* Pagination */}
         <div className="flex shrink-0 items-center justify-center gap-3 border-t border-gray-200 py-4 text-sm">
+          {visiblePages[0] > 1 && <span className="text-gray-400">..</span>}
           {visiblePages.map((page) => (
             <button
               key={page}
@@ -134,17 +182,9 @@ export default function DataWarga() {
               {page}
             </button>
           ))}
-          <span className="text-gray-400">..</span>
-          <button
-            onClick={() => setCurrentPage(totalPages)}
-            className={`font-medium transition  ${
-              currentPage === totalPages
-                ? "font-bold text-primary"
-                : "text-font hover:text-primary"
-            } `}
-          >
-            {totalPages}
-          </button>
+          {visiblePages[visiblePages.length - 1] < totalPages && (
+            <span className="text-gray-400">..</span>
+          )}
         </div>
       </div>
     </div>

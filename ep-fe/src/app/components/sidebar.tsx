@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import { logoutUser } from "../services/auth/authUser";
 
 interface MenuItem {
   label: string;
@@ -157,7 +158,7 @@ export default function Sidebar() {
               />
             </button>
             <button
-              onClick={() => router.replace("/login")}
+              onClick={() => logoutUser()}
               className="w-9 h-9 flex items-center justify-center rounded-lg bg-neutral-900 text-white hover:bg-neutral-700 transition cursor-pointer"
               aria-label="Logout"
             >
