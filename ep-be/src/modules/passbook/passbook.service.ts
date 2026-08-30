@@ -13,8 +13,8 @@ export async function getPassbook(token: string): Promise<PassbookDto> {
   // No organizationId scoping here by design - the token itself IS the
   // access credential for this public, unauthenticated route (see
   // prisma/README.md "Public receipts": there is intentionally no anonymous
-  // RLS policy on members/deposits, so this backend route is the only path
-  // to this data).
+  // RLS policy on members/transactions, so this backend route is the only
+  // path to this data).
   const member = await prisma.member.findFirst({
     where: { publicToken: token, isActive: true },
     select: {
@@ -27,51 +27,56 @@ export async function getPassbook(token: string): Promise<PassbookDto> {
   });
   if (!member) throw new PassbookNotFoundError();
 
-  const [deposits, redemptions, balanceAgg] = await Promise.all([
-    prisma.deposit.findMany({
-      where: {
-        organizationId: member.organizationId,
-        memberId: member.id,
-        status: "VERIFIED",
-      },
-      include: { items: { include: { wasteType: { select: { name: true } } } } },
-      orderBy: { verifiedAt: "desc" },
-      take: HISTORY_LIMIT,
-    }),
-    prisma.redemption.findMany({
+  const [transactions, withdrawals, balanceAgg] = await Promise.all([
+    prisma.transaction.findMany({
       where: {
         organizationId: member.organizationId,
         memberId: member.id,
         status: "COMPLETED",
+        settlementMethod: "SAVINGS",
       },
-      orderBy: { createdAt: "desc" },
+      include: {
+        items: { include: { wasteType: { select: { name: true } } } },
+      },
+      orderBy: { completedAt: "desc" },
       take: HISTORY_LIMIT,
     }),
-    prisma.pointLedger.aggregate({
+    prisma.withdrawal.findMany({
+      where: {
+        organizationId: member.organizationId,
+        memberId: member.id,
+        status: "PAID",
+      },
+      orderBy: { paidAt: "desc" },
+      take: HISTORY_LIMIT,
+    }),
+    prisma.ledgerEntry.aggregate({
       where: { organizationId: member.organizationId, memberId: member.id },
-      _sum: { points: true },
+      _sum: { amountRupiah: true },
     }),
   ]);
 
-  const depositHistory: PassbookHistoryEntryDto[] = deposits.map((deposit) => ({
-    type: "DEPOSIT",
-    points: deposit.items
-      .reduce((sum, item) => sum.add(item.subtotalPoints), new Prisma.Decimal(0))
-      .toString(),
-    description: deposit.items.map((item) => item.wasteType.name).join(", "),
-    occurredAt: (deposit.verifiedAt ?? deposit.createdAt).toISOString(),
-  }));
-
-  const redemptionHistory: PassbookHistoryEntryDto[] = redemptions.map(
-    (redemption) => ({
-      type: "REDEMPTION",
-      points: redemption.points.negated().toString(),
-      description: redemption.redemptionType,
-      occurredAt: redemption.createdAt.toISOString(),
+  const depositHistory: PassbookHistoryEntryDto[] = transactions.map(
+    (transaction) => ({
+      type: "DEPOSIT",
+      amountRupiah: (transaction.totalRupiah ?? new Prisma.Decimal(0)).toString(),
+      description: transaction.items
+        .map((item) => item.wasteType.name)
+        .join(", "),
+      occurredAt: (transaction.completedAt ?? transaction.createdAt).toISOString(),
     }),
   );
 
-  const history = [...depositHistory, ...redemptionHistory]
+  const withdrawalHistory: PassbookHistoryEntryDto[] = withdrawals.map(
+    (withdrawal) => ({
+      type: "WITHDRAWAL",
+      amountRupiah: withdrawal.amountRupiah.negated().toString(),
+      description: withdrawal.notes ?? "Penarikan tabungan",
+      occurredAt: (withdrawal.paidAt ?? withdrawal.createdAt).toISOString(),
+    }),
+  );
+
+  const history = [...depositHistory, ...withdrawalHistory]
     .sort((a, b) => (a.occurredAt < b.occurredAt ? 1 : -1))
     .slice(0, HISTORY_LIMIT);
 
@@ -79,7 +84,7 @@ export async function getPassbook(token: string): Promise<PassbookDto> {
     memberNumber: member.memberNumber,
     fullName: member.fullName,
     memberType: member.type,
-    balance: (balanceAgg._sum.points ?? new Prisma.Decimal(0)).toString(),
+    balanceRupiah: (balanceAgg._sum.amountRupiah ?? new Prisma.Decimal(0)).toString(),
     history,
   };
 }

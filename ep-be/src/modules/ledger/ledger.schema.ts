@@ -1,11 +1,16 @@
 import { z } from "zod";
 
-export const ledgerSourceTypeSchema = z.enum(["DEPOSIT", "REDEMPTION"]);
-export const ledgerEntryTypeSchema = z.enum(["CREDIT", "DEBIT", "REVERSAL"]);
+export const ledgerEntryTypeSchema = z.enum([
+  "DEPOSIT",
+  "WITHDRAWAL",
+  "OPENING_BALANCE",
+  "REVERSAL",
+  "ADJUSTMENT",
+]);
 
 export const listLedgerSchema = z.object({
   memberId: z.string().uuid().optional(),
-  sourceType: ledgerSourceTypeSchema.optional(),
+  entryType: ledgerEntryTypeSchema.optional(),
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(20),
 });

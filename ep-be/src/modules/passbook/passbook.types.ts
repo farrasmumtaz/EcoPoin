@@ -1,10 +1,10 @@
 import type { MemberType } from "@/generated/prisma/enums";
 
 export interface PassbookHistoryEntryDto {
-  readonly type: "DEPOSIT" | "REDEMPTION";
-  // Signed decimal as a string: positive for a deposit credit, negative for
-  // a redemption debit.
-  readonly points: string;
+  readonly type: "DEPOSIT" | "WITHDRAWAL";
+  // Signed decimal as a string: positive for a savings deposit, negative for
+  // a paid withdrawal.
+  readonly amountRupiah: string;
   readonly description: string;
   readonly occurredAt: string;
 }
@@ -16,6 +16,6 @@ export interface PassbookDto {
   readonly memberNumber: string;
   readonly fullName: string;
   readonly memberType: MemberType;
-  readonly balance: string;
+  readonly balanceRupiah: string;
   readonly history: readonly PassbookHistoryEntryDto[];
 }

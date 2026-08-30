@@ -1,5 +1,5 @@
-import { depositIdSchema, rejectDepositSchema } from "@/modules/deposits/deposit.schema";
-import { rejectDeposit } from "@/modules/deposits/deposit.service";
+import { withdrawalIdSchema } from "@/modules/withdrawals/withdrawal.schema";
+import { approveWithdrawal } from "@/modules/withdrawals/withdrawal.service";
 import { requireRole } from "@/shared/auth/require-role";
 import { errorResponse, successResponse } from "@/shared/http/api-response";
 import { parseSchema } from "@/shared/validation/parse-schema";
@@ -9,16 +9,15 @@ interface RouteContext {
 }
 
 export async function POST(
-  request: Request,
+  _request: Request,
   context: RouteContext,
 ): Promise<Response> {
   try {
     const user = await requireRole(["ADMIN", "COORDINATOR"]);
     const { id } = await context.params;
-    const depositId = parseSchema(depositIdSchema, id);
-    const { reason } = parseSchema(rejectDepositSchema, await request.json());
+    const withdrawalId = parseSchema(withdrawalIdSchema, id);
     return successResponse({
-      deposit: await rejectDeposit(user.organizationId, user.id, depositId, reason),
+      withdrawal: await approveWithdrawal(user.organizationId, user.id, withdrawalId),
     });
   } catch (error: unknown) {
     return errorResponse(error);
