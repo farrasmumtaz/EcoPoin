@@ -11,8 +11,8 @@ interface RouteContext {
 // Kept as its own file under the existing members/[id]/ path rather than
 // touching src/modules/members/* - that module is already done/merged, this
 // is purely additive. Balance is intentionally NOT stored on Member; it's
-// always computed live from point_ledger (see prisma/README.md "Ledger
-// convention" and roadmap task 29's note "saldo jangan disimpan mentah").
+// always computed live from ledger_entries (see prisma/README.md "Ledger
+// convention" and root README.md "Saldo dihitung dari agregasi ledger").
 export async function GET(
   _request: Request,
   context: RouteContext,

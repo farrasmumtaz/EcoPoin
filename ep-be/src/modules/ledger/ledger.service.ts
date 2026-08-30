@@ -1,4 +1,5 @@
 import type { Prisma } from "@/generated/prisma/client";
+import type { LedgerEntryType } from "@/generated/prisma/enums";
 import { getPrisma } from "@/infrastructure/database/prisma";
 import { MemberNotFoundError } from "@/modules/members/member.errors";
 import type { ListLedgerInput } from "@/modules/ledger/ledger.schema";
@@ -10,9 +11,9 @@ import type {
 
 const ledgerRelations = {
   member: { select: { memberNumber: true, fullName: true } },
-} satisfies Prisma.PointLedgerInclude;
+} satisfies Prisma.LedgerEntryInclude;
 
-type LedgerEntryWithRelations = Prisma.PointLedgerGetPayload<{
+type LedgerEntryWithRelations = Prisma.LedgerEntryGetPayload<{
   include: typeof ledgerRelations;
 }>;
 
@@ -23,8 +24,7 @@ function toDto(entry: LedgerEntryWithRelations): LedgerEntryDto {
     memberNumber: entry.member.memberNumber,
     memberFullName: entry.member.fullName,
     entryType: entry.entryType,
-    points: entry.points.toString(),
-    sourceType: entry.sourceType,
+    amountRupiah: entry.amountRupiah.toString(),
     sourceId: entry.sourceId,
     reversalOfId: entry.reversalOfId,
     createdAt: entry.createdAt.toISOString(),
@@ -36,21 +36,21 @@ export async function listLedgerEntries(
   input: ListLedgerInput,
 ): Promise<PaginatedLedgerEntries> {
   const prisma = getPrisma();
-  const where: Prisma.PointLedgerWhereInput = {
+  const where: Prisma.LedgerEntryWhereInput = {
     organizationId,
     ...(input.memberId ? { memberId: input.memberId } : {}),
-    ...(input.sourceType ? { sourceType: input.sourceType } : {}),
+    ...(input.entryType ? { entryType: input.entryType } : {}),
   };
   const skip = (input.page - 1) * input.limit;
   const [items, total] = await prisma.$transaction([
-    prisma.pointLedger.findMany({
+    prisma.ledgerEntry.findMany({
       where,
       include: ledgerRelations,
       orderBy: { createdAt: "desc" },
       skip,
       take: input.limit,
     }),
-    prisma.pointLedger.count({ where }),
+    prisma.ledgerEntry.count({ where }),
   ]);
 
   return {
@@ -75,60 +75,58 @@ export async function getMemberBalance(
   });
   if (!member) throw new MemberNotFoundError();
 
-  const result = await prisma.pointLedger.aggregate({
+  const result = await prisma.ledgerEntry.aggregate({
     where: { organizationId, memberId },
-    _sum: { points: true },
+    _sum: { amountRupiah: true },
   });
 
   return {
     memberId,
-    balance: (result._sum.points ?? 0).toString(),
+    balanceRupiah: (result._sum.amountRupiah ?? 0).toString(),
   };
 }
 
 interface RecordLedgerEntryParams {
   readonly organizationId: string;
   readonly memberId: string;
+  readonly entryType: LedgerEntryType;
   // Always the positive magnitude; credit/debit sign is applied internally
   // so callers can't accidentally pass a signed value the wrong way round.
-  readonly points: Prisma.Decimal;
-  readonly sourceType: "DEPOSIT" | "REDEMPTION";
+  readonly amountRupiah: Prisma.Decimal;
   readonly sourceId: string;
 }
 
 // Both helpers must be called with the SAME transaction client that performs
-// the triggering write (deposit verification, redemption creation) so the
-// ledger entry is atomic with it. `point_ledger` has a unique
-// (organization_id, source_type, source_id, entry_type) constraint, so
-// calling either twice for the same source is safe to retry - it will raise
-// a P2002 rather than double-crediting/debiting.
-export async function creditPoints(
+// the triggering write (transaction settle, withdrawal pay) so the ledger
+// entry is atomic with it. `ledger_entries` has a unique
+// (organization_id, entry_type, source_id) constraint, so calling either
+// twice for the same source is safe to retry - it will raise a P2002 rather
+// than double-crediting/debiting.
+export async function creditLedger(
   tx: Prisma.TransactionClient,
   params: RecordLedgerEntryParams,
 ): Promise<void> {
-  await tx.pointLedger.create({
+  await tx.ledgerEntry.create({
     data: {
       organizationId: params.organizationId,
       memberId: params.memberId,
-      entryType: "CREDIT",
-      points: params.points,
-      sourceType: params.sourceType,
+      entryType: params.entryType,
+      amountRupiah: params.amountRupiah,
       sourceId: params.sourceId,
     },
   });
 }
 
-export async function debitPoints(
+export async function debitLedger(
   tx: Prisma.TransactionClient,
   params: RecordLedgerEntryParams,
 ): Promise<void> {
-  await tx.pointLedger.create({
+  await tx.ledgerEntry.create({
     data: {
       organizationId: params.organizationId,
       memberId: params.memberId,
-      entryType: "DEBIT",
-      points: params.points.negated(),
-      sourceType: params.sourceType,
+      entryType: params.entryType,
+      amountRupiah: params.amountRupiah.negated(),
       sourceId: params.sourceId,
     },
   });

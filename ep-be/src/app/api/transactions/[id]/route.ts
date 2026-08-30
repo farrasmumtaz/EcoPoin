@@ -1,5 +1,5 @@
-import { depositIdSchema } from "@/modules/deposits/deposit.schema";
-import { getDeposit } from "@/modules/deposits/deposit.service";
+import { transactionIdSchema } from "@/modules/transactions/transaction.schema";
+import { getTransaction } from "@/modules/transactions/transaction.service";
 import { requireAuth } from "@/shared/auth/require-auth";
 import { errorResponse, successResponse } from "@/shared/http/api-response";
 import { parseSchema } from "@/shared/validation/parse-schema";
@@ -15,9 +15,9 @@ export async function GET(
   try {
     const user = await requireAuth();
     const { id } = await context.params;
-    const depositId = parseSchema(depositIdSchema, id);
+    const transactionId = parseSchema(transactionIdSchema, id);
     return successResponse({
-      deposit: await getDeposit(user.organizationId, depositId),
+      transaction: await getTransaction(user.organizationId, transactionId),
     });
   } catch (error: unknown) {
     return errorResponse(error);

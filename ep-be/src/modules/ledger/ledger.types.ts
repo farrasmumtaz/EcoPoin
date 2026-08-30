@@ -1,7 +1,4 @@
-import type {
-  LedgerEntryType,
-  LedgerSourceType,
-} from "@/generated/prisma/enums";
+import type { LedgerEntryType } from "@/generated/prisma/enums";
 
 export interface LedgerEntryDto {
   readonly id: string;
@@ -9,9 +6,10 @@ export interface LedgerEntryDto {
   readonly memberNumber: string;
   readonly memberFullName: string;
   readonly entryType: LedgerEntryType;
-  // Signed decimal as a string: positive for CREDIT, negative for DEBIT.
-  readonly points: string;
-  readonly sourceType: LedgerSourceType;
+  // Signed decimal as a string: positive increases the balance (DEPOSIT,
+  // OPENING_BALANCE), negative decreases it (WITHDRAWAL). REVERSAL/ADJUSTMENT
+  // carry whichever sign undoes or corrects the original entry.
+  readonly amountRupiah: string;
   readonly sourceId: string;
   readonly reversalOfId: string | null;
   readonly createdAt: string;
@@ -29,5 +27,5 @@ export interface PaginatedLedgerEntries {
 
 export interface MemberBalanceDto {
   readonly memberId: string;
-  readonly balance: string;
+  readonly balanceRupiah: string;
 }

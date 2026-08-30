@@ -29,34 +29,39 @@ enum WasteCategory {
   @@map("waste_category")
 }
 
-enum DepositStatus {
+enum SettlementMethod {
+  DIRECT_CASH
+  SAVINGS
+
+  @@map("settlement_method")
+}
+
+enum TransactionStatus {
   DRAFT
-  VERIFIED
-  REJECTED
-
-  @@map("deposit_status")
-}
-
-enum LedgerEntryType {
-  CREDIT
-  DEBIT
-  REVERSAL
-
-  @@map("ledger_entry_type")
-}
-
-enum LedgerSourceType {
-  DEPOSIT
-  REDEMPTION
-
-  @@map("ledger_source_type")
-}
-
-enum RedemptionStatus {
+  FINALIZED
   COMPLETED
   CANCELLED
 
-  @@map("redemption_status")
+  @@map("transaction_status")
+}
+
+enum WithdrawalStatus {
+  REQUESTED
+  APPROVED
+  PAID
+  REJECTED
+
+  @@map("withdrawal_status")
+}
+
+enum LedgerEntryType {
+  DEPOSIT
+  WITHDRAWAL
+  OPENING_BALANCE
+  REVERSAL
+  ADJUSTMENT
+
+  @@map("ledger_entry_type")
 }
 
 model Organization {
@@ -71,9 +76,9 @@ model Organization {
   profiles            Profile[]
   members             Member[]
   wasteTypes          WasteType[]
-  deposits            Deposit[]
-  ledger              PointLedger[]
-  redemptions         Redemption[]
+  transactions        Transaction[]
+  ledgerEntries       LedgerEntry[]
+  withdrawals         Withdrawal[]
   auditLogs           AuditLog[]
   memberRelationships MemberRelationship[]
 
@@ -90,12 +95,15 @@ model Profile {
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  organization         Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  createdDeposits      Deposit[]    @relation("DepositCreatedBy")
-  verifiedDeposits     Deposit[]    @relation("DepositVerifiedBy")
-  createdRedemptions   Redemption[] @relation("RedemptionCreatedBy")
-  cancelledRedemptions Redemption[] @relation("RedemptionCancelledBy")
-  auditLogs            AuditLog[]   @relation("AuditActor")
+  organization          Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  createdTransactions   Transaction[] @relation("TransactionCreatedBy")
+  completedTransactions Transaction[] @relation("TransactionCompletedBy")
+  cancelledTransactions Transaction[] @relation("TransactionCancelledBy")
+  createdWithdrawals    Withdrawal[]  @relation("WithdrawalCreatedBy")
+  approvedWithdrawals   Withdrawal[]  @relation("WithdrawalApprovedBy")
+  paidWithdrawals       Withdrawal[]  @relation("WithdrawalPaidBy")
+  rejectedWithdrawals   Withdrawal[]  @relation("WithdrawalRejectedBy")
+  auditLogs             AuditLog[]    @relation("AuditActor")
 
   @@index([organizationId, isActive])
   @@map("profiles")
@@ -118,9 +126,9 @@ model Member {
   updatedAt      DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   organization            Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  deposits                Deposit[]
-  ledger                  PointLedger[]
-  redemptions             Redemption[]
+  transactions            Transaction[]
+  ledgerEntries           LedgerEntry[]
+  withdrawals             Withdrawal[]
   individualRelationships MemberRelationship[] @relation("RelationshipIndividual")
   unitRelationships       MemberRelationship[] @relation("RelationshipUnit")
 
@@ -155,18 +163,40 @@ model WasteType {
   name           String        @db.VarChar(120)
   category       WasteCategory
   unit           String        @default("kg") @db.VarChar(16)
-  pointsPerKg    Decimal       @map("points_per_kg") @db.Decimal(14, 2)
   isActive       Boolean       @default(true) @map("is_active")
   createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  impactFactors ImpactFactor[]
-  depositItems  DepositItem[]
+  organization     Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  impactFactors    ImpactFactor[]
+  priceVersions    WastePriceVersion[]
+  transactionItems TransactionItem[]
 
   @@unique([organizationId, name])
   @@index([organizationId, category, isActive])
   @@map("waste_types")
+}
+
+// Versioned pricing (PRD v3.0 rupiah pivot): a price change never mutates old
+// rows, it closes the current open-ended version (effectiveUntil) and opens a
+// new one. priceScheme is a free-form string, not an enum, because whether
+// DIRECT_CASH and SAVINGS actually need different prices is still an open
+// field-research question (see root README "Validasi Sebelum Feature
+// Freeze"). Default "STANDARD" means "one price regardless of method" until
+// that's confirmed.
+model WastePriceVersion {
+  id             String    @id @default(uuid()) @db.Uuid
+  wasteTypeId    String    @map("waste_type_id") @db.Uuid
+  priceScheme    String    @default("STANDARD") @map("price_scheme") @db.VarChar(40)
+  pricePerKg     Decimal   @map("price_per_kg") @db.Decimal(14, 2)
+  effectiveFrom  DateTime  @default(now()) @map("effective_from") @db.Timestamptz(3)
+  effectiveUntil DateTime? @map("effective_until") @db.Timestamptz(3)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  wasteType WasteType @relation(fields: [wasteTypeId], references: [id], onDelete: Restrict)
+
+  @@index([wasteTypeId, priceScheme, effectiveFrom])
+  @@map("waste_price_versions")
 }
 
 model ImpactFactor {
@@ -186,93 +216,111 @@ model ImpactFactor {
   @@map("impact_factors")
 }
 
-model Deposit {
-  id              String        @id @default(uuid()) @db.Uuid
-  organizationId  String        @map("organization_id") @db.Uuid
-  memberId        String        @map("member_id") @db.Uuid
-  status          DepositStatus @default(DRAFT)
-  receiptToken    String        @unique @default(uuid()) @map("receipt_token") @db.Uuid
-  clientUuid      String        @map("client_uuid") @db.Uuid
-  photoPath       String?       @map("photo_path") @db.Text
-  createdBy       String        @map("created_by") @db.Uuid
-  verifiedBy      String?       @map("verified_by") @db.Uuid
-  verifiedAt      DateTime?     @map("verified_at") @db.Timestamptz(3)
-  rejectionReason String?       @map("rejection_reason") @db.VarChar(500)
-  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+// PRD v3.0: replaces the old points-based Deposit. A transaction is recorded
+// by staff (never the member), locked at FINALIZED, then settled as either
+// DIRECT_CASH (no ledger effect) or SAVINGS (exactly one DEPOSIT ledger
+// credit) - see root README "Alur Utama" and "Aturan Bisnis Kritis".
+model Transaction {
+  id                 String            @id @default(uuid()) @db.Uuid
+  organizationId     String            @map("organization_id") @db.Uuid
+  memberId           String            @map("member_id") @db.Uuid
+  status             TransactionStatus @default(DRAFT)
+  settlementMethod   SettlementMethod? @map("settlement_method")
+  totalRupiah        Decimal?          @map("total_rupiah") @db.Decimal(16, 2)
+  receiptToken       String            @unique @default(uuid()) @map("receipt_token") @db.Uuid
+  clientUuid         String            @map("client_uuid") @db.Uuid
+  photoPath          String?           @map("photo_path") @db.Text
+  createdBy          String            @map("created_by") @db.Uuid
+  finalizedAt        DateTime?         @map("finalized_at") @db.Timestamptz(3)
+  completedBy        String?           @map("completed_by") @db.Uuid
+  completedAt        DateTime?         @map("completed_at") @db.Timestamptz(3)
+  cancelledBy        String?           @map("cancelled_by") @db.Uuid
+  cancelledAt        DateTime?         @map("cancelled_at") @db.Timestamptz(3)
+  cancellationReason String?           @map("cancellation_reason") @db.VarChar(500)
+  createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  member       Member        @relation(fields: [memberId], references: [id], onDelete: Restrict)
-  creator      Profile       @relation("DepositCreatedBy", fields: [createdBy], references: [id], onDelete: Restrict)
-  verifier     Profile?      @relation("DepositVerifiedBy", fields: [verifiedBy], references: [id], onDelete: Restrict)
-  items        DepositItem[]
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  member       Member            @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  creator      Profile           @relation("TransactionCreatedBy", fields: [createdBy], references: [id], onDelete: Restrict)
+  completer    Profile?          @relation("TransactionCompletedBy", fields: [completedBy], references: [id], onDelete: Restrict)
+  canceller    Profile?          @relation("TransactionCancelledBy", fields: [cancelledBy], references: [id], onDelete: Restrict)
+  items        TransactionItem[]
 
   @@unique([organizationId, clientUuid])
   @@index([organizationId, status, createdAt])
   @@index([organizationId, memberId, createdAt])
-  @@map("deposits")
+  @@map("transactions")
 }
 
-model DepositItem {
-  id                  String  @id @default(uuid()) @db.Uuid
-  depositId           String  @map("deposit_id") @db.Uuid
-  wasteTypeId         String  @map("waste_type_id") @db.Uuid
-  weightKg            Decimal @map("weight_kg") @db.Decimal(12, 3)
-  pointsPerKgSnapshot Decimal @map("points_per_kg_snapshot") @db.Decimal(14, 2)
-  subtotalPoints      Decimal @map("subtotal_points") @db.Decimal(16, 2)
+model TransactionItem {
+  id                 String  @id @default(uuid()) @db.Uuid
+  transactionId      String  @map("transaction_id") @db.Uuid
+  wasteTypeId        String  @map("waste_type_id") @db.Uuid
+  weightKg           Decimal @map("weight_kg") @db.Decimal(12, 3)
+  pricePerKgSnapshot Decimal @map("price_per_kg_snapshot") @db.Decimal(14, 2)
+  subtotalRupiah     Decimal @map("subtotal_rupiah") @db.Decimal(16, 2)
 
-  deposit   Deposit   @relation(fields: [depositId], references: [id], onDelete: Cascade)
-  wasteType WasteType @relation(fields: [wasteTypeId], references: [id], onDelete: Restrict)
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  wasteType   WasteType   @relation(fields: [wasteTypeId], references: [id], onDelete: Restrict)
 
-  @@unique([depositId, wasteTypeId])
+  @@unique([transactionId, wasteTypeId])
   @@index([wasteTypeId])
-  @@map("deposit_items")
+  @@map("transaction_items")
 }
 
-model PointLedger {
-  id             String           @id @default(uuid()) @db.Uuid
-  organizationId String           @map("organization_id") @db.Uuid
-  memberId       String           @map("member_id") @db.Uuid
-  entryType      LedgerEntryType  @map("entry_type")
-  points         Decimal          @db.Decimal(16, 2)
-  sourceType     LedgerSourceType @map("source_type")
-  sourceId       String           @map("source_id") @db.Uuid
-  reversalOfId   String?          @map("reversal_of_id") @db.Uuid
-  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+model LedgerEntry {
+  id             String          @id @default(uuid()) @db.Uuid
+  organizationId String          @map("organization_id") @db.Uuid
+  memberId       String          @map("member_id") @db.Uuid
+  entryType      LedgerEntryType @map("entry_type")
+  amountRupiah   Decimal         @map("amount_rupiah") @db.Decimal(16, 2)
+  sourceId       String          @map("source_id") @db.Uuid
+  reversalOfId   String?         @unique @map("reversal_of_id") @db.Uuid
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
 
   organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   member       Member        @relation(fields: [memberId], references: [id], onDelete: Restrict)
-  reversalOf   PointLedger?  @relation("LedgerReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
-  reversedBy   PointLedger[] @relation("LedgerReversal")
+  reversalOf   LedgerEntry?  @relation("LedgerReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
+  reversedBy   LedgerEntry[] @relation("LedgerReversal")
 
-  @@unique([organizationId, sourceType, sourceId, entryType])
-  @@unique([reversalOfId])
+  @@unique([organizationId, entryType, sourceId])
   @@index([organizationId, memberId, createdAt])
-  @@map("point_ledger")
+  @@map("ledger_entries")
 }
 
-model Redemption {
-  id                 String           @id @default(uuid()) @db.Uuid
-  organizationId     String           @map("organization_id") @db.Uuid
-  memberId           String           @map("member_id") @db.Uuid
-  points             Decimal          @db.Decimal(16, 2)
-  redemptionType     String           @map("redemption_type") @db.VarChar(120)
-  status             RedemptionStatus @default(COMPLETED)
-  notes              String?          @db.VarChar(500)
-  createdBy          String           @map("created_by") @db.Uuid
-  cancelledBy        String?          @map("cancelled_by") @db.Uuid
-  cancellationReason String?          @map("cancellation_reason") @db.VarChar(500)
-  cancelledAt        DateTime?        @map("cancelled_at") @db.Timestamptz(3)
-  createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+// PRD v3.0: replaces the old immediate-debit Redemption. Withdrawals use a
+// separate REQUESTED -> APPROVED -> PAID flow (or REJECTED); the ledger debit
+// only happens at PAID, with the balance re-checked inside that same DB
+// transaction - see root README "Model Ledger" and "Aturan Bisnis Kritis".
+model Withdrawal {
+  id              String           @id @default(uuid()) @db.Uuid
+  organizationId  String           @map("organization_id") @db.Uuid
+  memberId        String           @map("member_id") @db.Uuid
+  amountRupiah    Decimal          @map("amount_rupiah") @db.Decimal(16, 2)
+  status          WithdrawalStatus @default(REQUESTED)
+  notes           String?          @db.VarChar(500)
+  proofPath       String?          @map("proof_path") @db.Text
+  createdBy       String           @map("created_by") @db.Uuid
+  approvedBy      String?          @map("approved_by") @db.Uuid
+  approvedAt      DateTime?        @map("approved_at") @db.Timestamptz(3)
+  paidBy          String?          @map("paid_by") @db.Uuid
+  paidAt          DateTime?        @map("paid_at") @db.Timestamptz(3)
+  rejectedBy      String?          @map("rejected_by") @db.Uuid
+  rejectedAt      DateTime?        @map("rejected_at") @db.Timestamptz(3)
+  rejectionReason String?          @map("rejection_reason") @db.VarChar(500)
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   member       Member       @relation(fields: [memberId], references: [id], onDelete: Restrict)
-  creator      Profile      @relation("RedemptionCreatedBy", fields: [createdBy], references: [id], onDelete: Restrict)
-  canceller    Profile?     @relation("RedemptionCancelledBy", fields: [cancelledBy], references: [id], onDelete: Restrict)
+  creator      Profile      @relation("WithdrawalCreatedBy", fields: [createdBy], references: [id], onDelete: Restrict)
+  approver     Profile?     @relation("WithdrawalApprovedBy", fields: [approvedBy], references: [id], onDelete: Restrict)
+  payer        Profile?     @relation("WithdrawalPaidBy", fields: [paidBy], references: [id], onDelete: Restrict)
+  rejecter     Profile?     @relation("WithdrawalRejectedBy", fields: [rejectedBy], references: [id], onDelete: Restrict)
 
   @@index([organizationId, memberId, createdAt])
   @@index([organizationId, status, createdAt])
-  @@map("redemptions")
+  @@map("withdrawals")
 }
 
 model AuditLog {

@@ -1,14 +1,15 @@
 {
   "info": {
-    "name": "EcoPoin — Phase 3 (Verifikasi, Ledger, Redemption, Passbook)",
-    "description": "Auth is cookie-based (Supabase SSR session), not a bearer token. Run 'Login' first with Postman's cookie jar enabled (default) and every later request in this collection will carry the session cookie automatically. 'Get Passbook (public)' is the only request that needs no login. Set the `base_url` variable to wherever `ep-be` is running (docker compose default: http://localhost:3101).",
+    "name": "EcoPoin — Phase 3 (Transaksi Rupiah, Ledger, Withdrawal, Passbook)",
+    "description": "Auth is cookie-based (Supabase SSR session), not a bearer token. Run 'Login' first with Postman's cookie jar enabled (default) and every later request in this collection will carry the session cookie automatically. 'Get Passbook (public)' is the only request that needs no login. Set the `base_url` variable to wherever `ep-be` is running (docker compose default: http://localhost:3101). Run `prisma/seed-phase3-test-data.sql` in the Supabase SQL editor first to get a ready-to-use transaction_id and withdrawal_id (it also prints them via RAISE NOTICE).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     { "key": "base_url", "value": "http://localhost:3101" },
     { "key": "member_id", "value": "" },
-    { "key": "deposit_id", "value": "" },
-    { "key": "redemption_id", "value": "" },
+    { "key": "waste_type_id", "value": "" },
+    { "key": "transaction_id", "value": "" },
+    { "key": "withdrawal_id", "value": "" },
     { "key": "passbook_token", "value": "" }
   ],
   "item": [
@@ -44,52 +45,125 @@
       ]
     },
     {
-      "name": "Deposits",
+      "name": "Waste Type Prices",
       "item": [
         {
-          "name": "List Deposits",
+          "name": "List Price Versions",
           "request": {
             "method": "GET",
             "url": {
-              "raw": "{{base_url}}/api/deposits?status=DRAFT",
+              "raw": "{{base_url}}/api/waste-types/{{waste_type_id}}/prices",
               "host": ["{{base_url}}"],
-              "path": ["api", "deposits"],
+              "path": ["api", "waste-types", "{{waste_type_id}}", "prices"]
+            }
+          }
+        },
+        {
+          "name": "Get Active Price",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/waste-types/{{waste_type_id}}/prices/active?priceScheme=STANDARD",
+              "host": ["{{base_url}}"],
+              "path": ["api", "waste-types", "{{waste_type_id}}", "prices", "active"],
+              "query": [{ "key": "priceScheme", "value": "STANDARD" }]
+            }
+          }
+        },
+        {
+          "name": "Create Price Version",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"priceScheme\": \"STANDARD\",\n  \"pricePerKg\": 1700\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/waste-types/{{waste_type_id}}/prices",
+              "host": ["{{base_url}}"],
+              "path": ["api", "waste-types", "{{waste_type_id}}", "prices"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Transactions",
+      "item": [
+        {
+          "name": "List Transactions",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/transactions?status=DRAFT",
+              "host": ["{{base_url}}"],
+              "path": ["api", "transactions"],
               "query": [{ "key": "status", "value": "DRAFT" }]
             }
           }
         },
         {
-          "name": "Get Deposit",
+          "name": "Get Transaction",
           "request": {
             "method": "GET",
             "url": {
-              "raw": "{{base_url}}/api/deposits/{{deposit_id}}",
+              "raw": "{{base_url}}/api/transactions/{{transaction_id}}",
               "host": ["{{base_url}}"],
-              "path": ["api", "deposits", "{{deposit_id}}"]
+              "path": ["api", "transactions", "{{transaction_id}}"]
             }
           }
         },
         {
-          "name": "Verify Deposit",
+          "name": "Finalize Transaction",
           "request": {
             "method": "POST",
             "url": {
-              "raw": "{{base_url}}/api/deposits/{{deposit_id}}/verify",
+              "raw": "{{base_url}}/api/transactions/{{transaction_id}}/finalize",
               "host": ["{{base_url}}"],
-              "path": ["api", "deposits", "{{deposit_id}}", "verify"]
+              "path": ["api", "transactions", "{{transaction_id}}", "finalize"]
             }
           }
         },
         {
-          "name": "Reject Deposit",
+          "name": "Settle Transaction (SAVINGS)",
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"reason\": \"Foto tidak sesuai jenis sampah yang dicatat.\"\n}" },
+            "body": { "mode": "raw", "raw": "{\n  \"settlementMethod\": \"SAVINGS\"\n}" },
             "url": {
-              "raw": "{{base_url}}/api/deposits/{{deposit_id}}/reject",
+              "raw": "{{base_url}}/api/transactions/{{transaction_id}}/settle",
               "host": ["{{base_url}}"],
-              "path": ["api", "deposits", "{{deposit_id}}", "reject"]
+              "path": ["api", "transactions", "{{transaction_id}}", "settle"]
+            }
+          }
+        },
+        {
+          "name": "Settle Transaction (DIRECT_CASH)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"settlementMethod\": \"DIRECT_CASH\"\n}" },
+            "url": {
+              "raw": "{{base_url}}/api/transactions/{{transaction_id}}/settle",
+              "host": ["{{base_url}}"],
+              "path": ["api", "transactions", "{{transaction_id}}", "settle"]
+            }
+          }
+        },
+        {
+          "name": "Cancel Transaction",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Salah input jenis sampah.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/transactions/{{transaction_id}}/cancel",
+              "host": ["{{base_url}}"],
+              "path": ["api", "transactions", "{{transaction_id}}", "cancel"]
             }
           }
         }
@@ -124,36 +198,71 @@
       ]
     },
     {
-      "name": "Redemptions",
+      "name": "Withdrawals",
       "item": [
         {
-          "name": "List Redemptions",
+          "name": "List Withdrawals",
           "request": {
             "method": "GET",
-            "url": { "raw": "{{base_url}}/api/redemptions", "host": ["{{base_url}}"], "path": ["api", "redemptions"] }
+            "url": { "raw": "{{base_url}}/api/withdrawals", "host": ["{{base_url}}"], "path": ["api", "withdrawals"] }
           }
         },
         {
-          "name": "Get Redemption",
+          "name": "Get Withdrawal",
           "request": {
             "method": "GET",
             "url": {
-              "raw": "{{base_url}}/api/redemptions/{{redemption_id}}",
+              "raw": "{{base_url}}/api/withdrawals/{{withdrawal_id}}",
               "host": ["{{base_url}}"],
-              "path": ["api", "redemptions", "{{redemption_id}}"]
+              "path": ["api", "withdrawals", "{{withdrawal_id}}"]
             }
           }
         },
         {
-          "name": "Create Redemption",
+          "name": "Request Withdrawal",
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"memberId\": \"{{member_id}}\",\n  \"points\": 10,\n  \"redemptionType\": \"Sembako\",\n  \"notes\": \"Ditukar di kantor RW\"\n}"
+              "raw": "{\n  \"memberId\": \"{{member_id}}\",\n  \"amountRupiah\": 5000,\n  \"notes\": \"Diambil tunai di kantor RW\"\n}"
             },
-            "url": { "raw": "{{base_url}}/api/redemptions", "host": ["{{base_url}}"], "path": ["api", "redemptions"] }
+            "url": { "raw": "{{base_url}}/api/withdrawals", "host": ["{{base_url}}"], "path": ["api", "withdrawals"] }
+          }
+        },
+        {
+          "name": "Approve Withdrawal",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/api/withdrawals/{{withdrawal_id}}/approve",
+              "host": ["{{base_url}}"],
+              "path": ["api", "withdrawals", "{{withdrawal_id}}", "approve"]
+            }
+          }
+        },
+        {
+          "name": "Pay Withdrawal",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/api/withdrawals/{{withdrawal_id}}/pay",
+              "host": ["{{base_url}}"],
+              "path": ["api", "withdrawals", "{{withdrawal_id}}", "pay"]
+            }
+          }
+        },
+        {
+          "name": "Reject Withdrawal",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"reason\": \"Saldo tidak mencukupi.\"\n}" },
+            "url": {
+              "raw": "{{base_url}}/api/withdrawals/{{withdrawal_id}}/reject",
+              "host": ["{{base_url}}"],
+              "path": ["api", "withdrawals", "{{withdrawal_id}}", "reject"]
+            }
           }
         }
       ]
