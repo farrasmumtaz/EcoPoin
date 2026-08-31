@@ -116,7 +116,7 @@ export async function getMembers(
   try {
     // NOTE: adjust the endpoint path ("/members") to match your backend.
     const response = await api.get<GetMembersResponse>("/members", {
-      params,
+      
     });
     return response.data.data;
   } catch (error: unknown) {

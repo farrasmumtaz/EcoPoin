@@ -2,50 +2,100 @@
 
 import { Search, Plus, X, Check, Eye } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import toast from "react-hot-toast";
 
-// ---------- Types ----------
-interface JenisSampah {
-  nama: string;
-  kategori: string;
-  satuan: string;
-  hargaPerKg: number;
-}
+import { getWasteTypes } from "@/app/services/waste-types/waste-types"; // adjust to your actual path
 
-// ---------- Static data (replace with real data / API calls) ----------
 const PAGE_SIZE = 9;
-const totalPages = 10;
 
-const jenisSampahData: JenisSampah[] = Array.from(
-  { length: PAGE_SIZE * totalPages },
-  () => ({
-    nama: "Plastik",
-    kategori: "Anorganik",
-    satuan: "Kg",
-    hargaPerKg: 3000,
-  }),
-);
+// Display labels for the confirmed/guessed backend category values.
+// NOTE: "ORGANIC" is unconfirmed — see wasteTypes.ts.
+const CATEGORY_LABELS: Record<string, string> = {
+  ORGANIC: "Organik",
+  INORGANIC: "Anorganik",
+};
 
-const visiblePages = [1, 2, 3, 4, 5, 6, 7];
+interface WasteTypeRow {
+  id: string;
+  name: string;
+  category: string;
+  unit: string;
+  pointsPerKg: number;
+}
 
 export default function JenisSampah() {
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+
+  const [items, setItems] = useState<WasteTypeRow[]>([]);
+  const [totalPages, setTotalPages] = useState(1);
+  const [isLoading, setIsLoading] = useState(true);
+
   const router = useRouter();
 
-  const pagedJenisSampah = jenisSampahData.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE,
-  );
+  // Debounce search input so we don't fire a request on every keystroke.
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setDebouncedSearch(search);
+      setCurrentPage(1);
+    }, 400);
+    return () => clearTimeout(timeout);
+  }, [search]);
 
-  const goToEditJenisSampah = (sampah: JenisSampah) => {
-    const params = new URLSearchParams({
-      nama: sampah.nama,
-      kategori: sampah.kategori,
-      satuan: sampah.satuan,
-      hargaPerKg: String(sampah.hargaPerKg),
-    });
-    router.push(`/jenis-sampah/edit-jenis-sampah?${params.toString()}`);
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchWasteTypes() {
+      try {
+        setIsLoading(true);
+        const { items, pagination } = await getWasteTypes({
+          page: currentPage,
+          limit: PAGE_SIZE,
+          search: debouncedSearch || undefined,
+        });
+        if (cancelled) return;
+        setItems(
+          items.map((wasteType) => ({
+            id: wasteType.id,
+            name: wasteType.name,
+            category: wasteType.category,
+            unit: wasteType.unit,
+            // pointsPerKg comes back as a string from the API — convert
+            // once here so the rest of the component works with a number.
+            pointsPerKg: Number(wasteType.pointsPerKg),
+          })),
+        );
+        setTotalPages(pagination.totalPages || 1);
+      } catch (err) {
+        if (cancelled) return;
+        toast.error(
+          err instanceof Error ? err.message : "Gagal memuat data jenis sampah.",
+        );
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    }
+
+    fetchWasteTypes();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentPage, debouncedSearch]);
+
+  const visiblePages = useMemo(() => {
+    const windowSize = 7;
+    let start = Math.max(1, currentPage - Math.floor(windowSize / 2));
+    const end = Math.min(totalPages, start + windowSize - 1);
+    start = Math.max(1, end - windowSize + 1);
+    return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+  }, [currentPage, totalPages]);
+
+  const goToEditJenisSampah = (wasteType: WasteTypeRow) => {
+    router.push(
+      `/jenis-sampah/edit-jenis-sampah?id=${encodeURIComponent(wasteType.id)}`,
+    );
   };
 
   return (
@@ -90,51 +140,72 @@ export default function JenisSampah() {
               </tr>
             </thead>
             <tbody>
-              {pagedJenisSampah.map((sampah, i) => (
-                <tr key={i} className="border-b border-gray-100 last:border-0">
-                  <td className="px-6 py-4 font-semibold text-font">
-                    {sampah.nama}
-                  </td>
-                  <td className="px-6 py-4 font-semibold text-font">
-                    {sampah.kategori}
-                  </td>
-                  <td className="px-6 py-4 text-center font-semibold text-font">
-                    {sampah.satuan}
-                  </td>
-                  <td className="px-6 py-4 text-center font-semibold text-font">
-                    {sampah.hargaPerKg.toLocaleString("id-ID")}
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex justify-end gap-2">
-                      <button
-                        aria-label={`Hapus ${sampah.nama}`}
-                        className="flex h-8 w-9 items-center justify-center rounded-md border border-danger text-danger transition hover:bg-danger hover:text-white duration-300 cursor-pointer"
-                      >
-                        <X size={15} />
-                      </button>
-                      <button
-                        aria-label={`Setujui ${sampah.nama}`}
-                        className="flex h-8 w-9 items-center justify-center rounded-md border border-primary text-primary transition hover:bg-primary hover:text-white duration-300 cursor-pointer"
-                      >
-                        <Check size={15} />
-                      </button>
-                      <button
-                        aria-label={`Lihat ${sampah.nama}`}
-                        onClick={() => goToEditJenisSampah(sampah)}
-                        className="flex h-8 w-9 items-center justify-center rounded-md border border-warning text-warning transition hover:bg-warning hover:text-white duration-300 cursor-pointer"
-                      >
-                        <Eye size={15} />
-                      </button>
-                    </div>
+              {isLoading ? (
+                <tr>
+                  <td colSpan={5} className="px-6 py-10 text-center text-font/60">
+                    Memuat data...
                   </td>
                 </tr>
-              ))}
+              ) : items.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-6 py-10 text-center text-font/60">
+                    Tidak ada data jenis sampah.
+                  </td>
+                </tr>
+              ) : (
+                items.map((sampah) => (
+                  <tr
+                    key={sampah.id}
+                    className="border-b border-gray-100 last:border-0"
+                  >
+                    <td className="px-6 py-4 font-semibold text-font">
+                      {sampah.name}
+                    </td>
+                    <td className="px-6 py-4 font-semibold text-font">
+                      {CATEGORY_LABELS[sampah.category] ?? sampah.category}
+                    </td>
+                    <td className="px-6 py-4 text-center font-semibold text-font">
+                      {sampah.unit}
+                    </td>
+                    <td className="px-6 py-4 text-center font-semibold text-font">
+                      {sampah.pointsPerKg.toLocaleString("id-ID")}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex justify-end gap-2">
+                        {/* NOTE: no confirmed delete/approve endpoints yet —
+                            these are UI-only until wasteTypes.ts has
+                            matching functions. */}
+                        <button
+                          aria-label={`Hapus ${sampah.name}`}
+                          className="flex h-8 w-9 items-center justify-center rounded-md border border-danger text-danger transition hover:bg-danger hover:text-white duration-300 cursor-pointer"
+                        >
+                          <X size={15} />
+                        </button>
+                        <button
+                          aria-label={`Setujui ${sampah.name}`}
+                          className="flex h-8 w-9 items-center justify-center rounded-md border border-primary text-primary transition hover:bg-primary hover:text-white duration-300 cursor-pointer"
+                        >
+                          <Check size={15} />
+                        </button>
+                        <button
+                          aria-label={`Lihat ${sampah.name}`}
+                          onClick={() => goToEditJenisSampah(sampah)}
+                          className="flex h-8 w-9 items-center justify-center rounded-md border border-warning text-warning transition hover:bg-warning hover:text-white duration-300 cursor-pointer"
+                        >
+                          <Eye size={15} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
 
         {/* Pagination */}
         <div className="flex shrink-0 items-center justify-center gap-3 border-t border-gray-200 py-4 text-sm">
+          {visiblePages[0] > 1 && <span className="text-gray-400">..</span>}
           {visiblePages.map((page) => (
             <button
               key={page}
@@ -148,17 +219,9 @@ export default function JenisSampah() {
               {page}
             </button>
           ))}
-          <span className="text-gray-400">..</span>
-          <button
-            onClick={() => setCurrentPage(totalPages)}
-            className={`font-medium transition ${
-              currentPage === totalPages
-                ? "font-bold text-primary"
-                : "text-font hover:text-primary"
-            }`}
-          >
-            {totalPages}
-          </button>
+          {visiblePages[visiblePages.length - 1] < totalPages && (
+            <span className="text-gray-400">..</span>
+          )}
         </div>
       </div>
     </div>

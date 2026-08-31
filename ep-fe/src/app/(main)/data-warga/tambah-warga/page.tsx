@@ -62,11 +62,13 @@ export default function TambahWarga() {
         unitIds: [],
       });
 
-      toast.success(`Warga "${member.fullName}" berhasil ditambahkan.`);
+      toast.success(`Warga "${namaWarga.trim()}" berhasil ditambahkan.`);
       router.push("/data-warga");
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : "Terjadi kesalahan, silakan coba lagi.",
+        err instanceof Error
+          ? err.message
+          : "Terjadi kesalahan, silakan coba lagi.",
       );
     } finally {
       setIsSubmitting(false);
