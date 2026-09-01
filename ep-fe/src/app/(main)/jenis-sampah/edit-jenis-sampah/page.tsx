@@ -2,161 +2,95 @@
 
 import { ChevronDown } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useMemo, FormEvent, Suspense } from "react";
+import { FormEvent, Suspense, useEffect, useState } from "react";
+import toast from "react-hot-toast";
 
-interface FormFieldLabelProps {
-  children: React.ReactNode;
-}
+import { getWasteTypeById, updateWasteType, type WasteCategory } from "@/app/services/waste-types/waste-types";
 
-function FormFieldLabel({ children }: FormFieldLabelProps) {
-  return (
-    <label className="mb-2 block text-sm font-bold text-font">{children}</label>
-  );
-}
+const categories: readonly { readonly value: WasteCategory; readonly label: string }[] = [
+  { value: "PLASTIC", label: "Plastik" },
+  { value: "PAPER", label: "Kertas" },
+  { value: "METAL", label: "Logam" },
+  { value: "GLASS", label: "Kaca" },
+  { value: "OTHER", label: "Lain-lain" },
+];
 
-// ---------- Static options (replace with real data / API calls) ----------
-const kategoriOptions = ["Organik", "Anorganik", "B3"];
-
-function EditJenisSampahForm() {
+function EditForm() {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const id = useSearchParams().get("id") ?? "";
+  const [name, setName] = useState("");
+  const [category, setCategory] = useState<WasteCategory>("PLASTIC");
+  const [unit, setUnit] = useState("kg");
+  const [sortedPrice, setSortedPrice] = useState("");
+  const [unsortedPrice, setUnsortedPrice] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
-  // Snapshot of the data passed in via query params from the Jenis Sampah
-  // table. "Ulang" restores the form to this snapshot instead of clearing it.
-  const originalData = useMemo(
-    () => ({
-      namaJenisSampah: searchParams.get("nama") ?? "",
-      kategori: searchParams.get("kategori") ?? "",
-      satuanUnit: searchParams.get("satuan") ?? "",
-      hargaPerKg: searchParams.get("hargaPerKg") ?? "",
-    }),
-    [searchParams],
-  );
+  useEffect(() => {
+    if (!id) return;
+    void getWasteTypeById(id)
+      .then((wasteType) => {
+        setName(wasteType.name);
+        setCategory(wasteType.category);
+        setUnit(wasteType.unit);
+        setSortedPrice(wasteType.prices.sorted);
+        setUnsortedPrice(wasteType.prices.unsorted);
+      })
+      .catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Data gagal dimuat."));
+  }, [id]);
 
-  const [namaJenisSampah, setNamaJenisSampah] = useState(
-    originalData.namaJenisSampah,
-  );
-  const [kategori, setKategori] = useState(originalData.kategori);
-  const [satuanUnit, setSatuanUnit] = useState(originalData.satuanUnit);
-  const [hargaPerKg, setHargaPerKg] = useState(originalData.hargaPerKg);
-
-  const resetForm = () => {
-    setNamaJenisSampah(originalData.namaJenisSampah);
-    setKategori(originalData.kategori);
-    setSatuanUnit(originalData.satuanUnit);
-    setHargaPerKg(originalData.hargaPerKg);
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
+    event.preventDefault();
+    if (!id || !name.trim() || Number(sortedPrice) <= 0 || Number(unsortedPrice) <= 0) {
+      toast.error("Lengkapi data dan pastikan kedua harga lebih dari nol.");
+      return;
+    }
+    setIsSaving(true);
+    try {
+      await updateWasteType(id, {
+        name: name.trim(),
+        category,
+        unit: unit.trim(),
+        sortedPricePerKg: Number(sortedPrice),
+        unsortedPricePerKg: Number(unsortedPrice),
+      });
+      toast.success("Jenis sampah berhasil diperbarui.");
+      router.push("/jenis-sampah");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Data gagal diperbarui.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    // TODO: call API to persist updated jenis sampah data
-    console.log({ namaJenisSampah, kategori, satuanUnit, hargaPerKg });
-  };
-
-  const inputClass =
-    "w-full rounded-md bg-placeholder/50 px-4 py-3 text-sm text-font placeholder:text-font/50 outline-none focus:ring-2 focus:ring-primary transition duration-300";
-
-  const selectClass =
-    "w-full appearance-none rounded-md bg-placeholder/50 px-4 py-3 pr-10 text-sm text-font outline-none focus:ring-2 focus:ring-primary transition duration-300";
-
+  const inputClass = "w-full rounded-md bg-placeholder/50 px-4 py-3 text-sm text-font outline-none focus:ring-2 focus:ring-primary";
   return (
-    <div className="min-h-full bg-white rounded-md p-6">
+    <div className="min-h-full rounded-md bg-white p-6">
       <form onSubmit={handleSubmit}>
-        {/* Nama Jenis Sampah */}
-        <div className="mb-6">
-          <FormFieldLabel>Nama Jenis Sampah</FormFieldLabel>
-          <input
-            type="text"
-            value={namaJenisSampah}
-            onChange={(e) => setNamaJenisSampah(e.target.value)}
-            placeholder="Isi nama jenis sampah"
-            className={inputClass}
-          />
-        </div>
-
-        {/* Kategori / Satuan Unit / Harga per Kg */}
-        <div className="mb-6 grid grid-cols-1 gap-6 md:grid-cols-3">
+        <label className="mb-2 block text-sm font-bold">Nama Jenis Sampah</label>
+        <input value={name} onChange={(event) => setName(event.target.value)} className={`${inputClass} mb-6`} />
+        <div className="mb-6 grid grid-cols-1 gap-6 md:grid-cols-4">
           <div>
-            <FormFieldLabel>Kategori</FormFieldLabel>
+            <label className="mb-2 block text-sm font-bold">Kategori</label>
             <div className="relative">
-              <select
-                value={kategori}
-                onChange={(e) => setKategori(e.target.value)}
-                className={selectClass}
-              >
-                <option value="" disabled>
-                  Pilih kategori
-                </option>
-                {kategoriOptions.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {opt}
-                  </option>
-                ))}
+              <select value={category} onChange={(event) => setCategory(event.target.value as WasteCategory)} className={`${inputClass} appearance-none pr-10`}>
+                {categories.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
               </select>
-              <ChevronDown
-                size={18}
-                className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-font/60"
-              />
+              <ChevronDown size={18} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2" />
             </div>
           </div>
-
-          <div>
-            <FormFieldLabel>Satuan Unit</FormFieldLabel>
-            <input
-              type="text"
-              value={satuanUnit}
-              onChange={(e) => setSatuanUnit(e.target.value)}
-              placeholder="Isi satuan unit"
-              className={inputClass}
-            />
-          </div>
-
-          <div>
-            <FormFieldLabel>Harga/Kg (Rp)</FormFieldLabel>
-            <input
-              type="number"
-              value={hargaPerKg}
-              onChange={(e) => setHargaPerKg(e.target.value)}
-              className={inputClass}
-            />
-          </div>
+          <div><label className="mb-2 block text-sm font-bold">Satuan</label><input value={unit} onChange={(event) => setUnit(event.target.value)} className={inputClass} /></div>
+          <div><label className="mb-2 block text-sm font-bold">Harga Dipilah/Kg</label><input type="number" min="1" value={sortedPrice} onChange={(event) => setSortedPrice(event.target.value)} className={inputClass} /></div>
+          <div><label className="mb-2 block text-sm font-bold">Harga Belum Dipilah/Kg</label><input type="number" min="1" value={unsortedPrice} onChange={(event) => setUnsortedPrice(event.target.value)} className={inputClass} /></div>
         </div>
-
-        {/* Actions */}
-        <div className="flex items-center gap-4">
-          <button
-            type="button"
-            onClick={() => router.back()}
-            className="rounded-md bg-placeholder px-8 py-3 font-semibold text-white transition hover:opacity-75 cursor-pointer duration-300"
-          >
-            Kembali
-          </button>
-          <button
-            type="button"
-            onClick={resetForm}
-            className="rounded-md bg-danger px-8 py-3 text-sm font-semibold text-white transition hover:opacity-75 cursor-pointer duration-300"
-          >
-            Ulang
-          </button>
-          <button
-            type="submit"
-            className="rounded-md bg-primary px-8 py-3 text-sm font-semibold text-white transition hover:opacity-75 cursor-pointer duration-300"
-          >
-            Simpan
-          </button>
+        <div className="flex gap-4">
+          <button type="button" onClick={() => router.back()} className="rounded-md bg-placeholder px-8 py-3 font-semibold text-white">Kembali</button>
+          <button type="submit" disabled={isSaving} className="rounded-md bg-primary px-8 py-3 font-semibold text-white disabled:opacity-50">{isSaving ? "Menyimpan..." : "Simpan"}</button>
         </div>
       </form>
     </div>
   );
 }
 
-// useSearchParams() opts the tree into client-side rendering unless wrapped
-// in Suspense, so the actual page default-exports a Suspense boundary
-// around the form rather than using useSearchParams directly here.
 export default function EditJenisSampah() {
-  return (
-    <Suspense fallback={null}>
-      <EditJenisSampahForm />
-    </Suspense>
-  );
+  return <Suspense fallback={null}><EditForm /></Suspense>;
 }

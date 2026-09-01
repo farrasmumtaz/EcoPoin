@@ -1,4 +1,4 @@
-import type { Prisma, WasteType } from "@/generated/prisma/client";
+import type { Prisma } from "@/generated/prisma/client";
 import { getPrisma } from "@/infrastructure/database/prisma";
 import {
   WasteTypeNameConflictError,
@@ -14,13 +14,36 @@ import type {
   WasteTypeDto,
 } from "@/modules/waste-types/waste-type.types";
 
-function toDto(wasteType: WasteType): WasteTypeDto {
+function getActivePriceInclude() {
+  const now = new Date();
+  return {
+    priceVersions: {
+      where: {
+        effectiveFrom: { lte: now },
+        OR: [{ effectiveUntil: null }, { effectiveUntil: { gt: now } }],
+      },
+      orderBy: { effectiveFrom: "desc" },
+      take: 1,
+    },
+  } satisfies Prisma.WasteTypeInclude;
+}
+
+type WasteTypeWithPrice = Prisma.WasteTypeGetPayload<{
+  include: ReturnType<typeof getActivePriceInclude>;
+}>;
+
+function toDto(wasteType: WasteTypeWithPrice): WasteTypeDto {
+  const sortedPrice = wasteType.priceVersions.find((price) => price.condition === "SORTED");
+  const unsortedPrice = wasteType.priceVersions.find((price) => price.condition === "UNSORTED");
   return {
     id: wasteType.id,
     name: wasteType.name,
     category: wasteType.category,
     unit: wasteType.unit,
-    pointsPerKg: wasteType.pointsPerKg.toString(),
+    prices: {
+      sorted: sortedPrice?.pricePerKg.toString() ?? "0",
+      unsorted: unsortedPrice?.pricePerKg.toString() ?? "0",
+    },
     isActive: wasteType.isActive,
     createdAt: wasteType.createdAt.toISOString(),
     updatedAt: wasteType.updatedAt.toISOString(),
@@ -62,6 +85,7 @@ export async function listWasteTypes(
   const [items, total] = await prisma.$transaction([
     prisma.wasteType.findMany({
       where,
+      include: getActivePriceInclude(),
       orderBy: [{ isActive: "desc" }, { name: "asc" }],
       skip,
       take: input.limit,
@@ -87,6 +111,7 @@ export async function getWasteType(
   const prisma = getPrisma();
   const wasteType = await prisma.wasteType.findFirst({
     where: { id, organizationId },
+    include: getActivePriceInclude(),
   });
   if (!wasteType) throw new WasteTypeNotFoundError();
   return toDto(wasteType);
@@ -102,9 +127,17 @@ export async function createWasteType(
   const wasteType = await prisma.wasteType.create({
     data: {
       organizationId,
-      ...input,
-      priceVersions: { create: { organizationId, pricePerKg: input.pointsPerKg, effectiveFrom: new Date(), createdBy: actorId } },
+      name: input.name,
+      category: input.category,
+      unit: input.unit,
+      priceVersions: {
+        create: [
+          { organizationId, condition: "SORTED", pricePerKg: input.sortedPricePerKg, effectiveFrom: new Date(), createdBy: actorId },
+          { organizationId, condition: "UNSORTED", pricePerKg: input.unsortedPricePerKg, effectiveFrom: new Date(), createdBy: actorId },
+        ],
+      },
     },
+    include: getActivePriceInclude(),
   });
   return toDto(wasteType);
 }
@@ -121,20 +154,32 @@ export async function updateWasteType(
   const prisma = getPrisma();
   const wasteType = await prisma.$transaction(async (tx) => {
     const changedAt = new Date();
-    if (input.pointsPerKg !== undefined) {
+    const changedConditions = [
+      ...(input.sortedPricePerKg !== undefined ? ["SORTED" as const] : []),
+      ...(input.unsortedPricePerKg !== undefined ? ["UNSORTED" as const] : []),
+    ];
+    if (changedConditions.length > 0) {
       await tx.wastePriceVersion.updateMany({
-        where: { organizationId, wasteTypeId: id, effectiveUntil: null },
+        where: { organizationId, wasteTypeId: id, condition: { in: changedConditions }, effectiveUntil: null },
         data: { effectiveUntil: changedAt },
       });
     }
+    const { sortedPricePerKg, unsortedPricePerKg, ...wasteTypeData } = input;
+    const newPrices = [
+      ...(sortedPricePerKg !== undefined
+        ? [{ organizationId, condition: "SORTED" as const, pricePerKg: sortedPricePerKg, effectiveFrom: changedAt, createdBy: actorId }]
+        : []),
+      ...(unsortedPricePerKg !== undefined
+        ? [{ organizationId, condition: "UNSORTED" as const, pricePerKg: unsortedPricePerKg, effectiveFrom: changedAt, createdBy: actorId }]
+        : []),
+    ];
     return tx.wasteType.update({
       where: { id },
       data: {
-        ...input,
-        ...(input.pointsPerKg !== undefined
-          ? { priceVersions: { create: { organizationId, pricePerKg: input.pointsPerKg, effectiveFrom: changedAt, createdBy: actorId } } }
-          : {}),
+        ...wasteTypeData,
+        ...(newPrices.length > 0 ? { priceVersions: { create: newPrices } } : {}),
       },
+      include: getActivePriceInclude(),
     });
   });
   return toDto(wasteType);
@@ -149,6 +194,7 @@ export async function deactivateWasteType(
   const wasteType = await prisma.wasteType.update({
     where: { id },
     data: { isActive: false },
+    include: getActivePriceInclude(),
   });
   return toDto(wasteType);
 }

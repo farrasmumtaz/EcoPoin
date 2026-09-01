@@ -12,8 +12,11 @@ const PAGE_SIZE = 9;
 // Display labels for the confirmed/guessed backend category values.
 // NOTE: "ORGANIC" is unconfirmed — see wasteTypes.ts.
 const CATEGORY_LABELS: Record<string, string> = {
-  ORGANIC: "Organik",
-  INORGANIC: "Anorganik",
+  PLASTIC: "Plastik",
+  PAPER: "Kertas",
+  METAL: "Logam",
+  GLASS: "Kaca",
+  OTHER: "Lain-lain",
 };
 
 interface WasteTypeRow {
@@ -21,7 +24,8 @@ interface WasteTypeRow {
   name: string;
   category: string;
   unit: string;
-  pointsPerKg: number;
+  sortedPricePerKg: number;
+  unsortedPricePerKg: number;
 }
 
 export default function JenisSampah() {
@@ -62,9 +66,8 @@ export default function JenisSampah() {
             name: wasteType.name,
             category: wasteType.category,
             unit: wasteType.unit,
-            // pointsPerKg comes back as a string from the API — convert
-            // once here so the rest of the component works with a number.
-            pointsPerKg: Number(wasteType.pointsPerKg),
+            sortedPricePerKg: Number(wasteType.prices.sorted),
+            unsortedPricePerKg: Number(wasteType.prices.unsorted),
           })),
         );
         setTotalPages(pagination.totalPages || 1);
@@ -134,21 +137,22 @@ export default function JenisSampah() {
                 <th className="px-6 py-4 font-bold">Kategori</th>
                 <th className="px-6 py-4 text-center font-bold">Satuan</th>
                 <th className="px-6 py-4 text-center font-bold">
-                  Harga/Kg (Rp)
+                  Dipilah/Kg (Rp)
                 </th>
+                <th className="px-6 py-4 text-center font-bold">Belum Dipilah/Kg (Rp)</th>
                 <th className="px-6 py-4 text-right font-bold">Aksi</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-10 text-center text-font/60">
+                  <td colSpan={6} className="px-6 py-10 text-center text-font/60">
                     Memuat data...
                   </td>
                 </tr>
               ) : items.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-10 text-center text-font/60">
+                  <td colSpan={6} className="px-6 py-10 text-center text-font/60">
                     Tidak ada data jenis sampah.
                   </td>
                 </tr>
@@ -168,7 +172,10 @@ export default function JenisSampah() {
                       {sampah.unit}
                     </td>
                     <td className="px-6 py-4 text-center font-semibold text-font">
-                      {sampah.pointsPerKg.toLocaleString("id-ID")}
+                      {sampah.sortedPricePerKg.toLocaleString("id-ID")}
+                    </td>
+                    <td className="px-6 py-4 text-center font-semibold text-font">
+                      {sampah.unsortedPricePerKg.toLocaleString("id-ID")}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex justify-end gap-2">

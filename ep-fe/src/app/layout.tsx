@@ -1,19 +1,9 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import type { ReactNode } from "react";
 import "./globals.css";
 import { Toaster } from "react-hot-toast";
 import { AuthInitializer } from "@/app/components/authInitializer"; // adjust to your actual path
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+import { SessionTimeout } from "@/app/components/sessionTimeout";
 
 export const metadata: Metadata = {
   title: "EcoPoin",
@@ -27,13 +17,11 @@ interface RootLayoutProps {
 
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
+    <html lang="id" className="h-full antialiased">
       <body className="min-h-full flex flex-col">
         {/* Renders nothing — kicks off the /auth/me session check once on app load */}
         <AuthInitializer />
+        <SessionTimeout />
         {children}
         <Toaster
           position="top-right"

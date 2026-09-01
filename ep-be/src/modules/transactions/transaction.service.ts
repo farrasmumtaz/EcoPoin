@@ -38,6 +38,7 @@ function toDto(record: TransactionRecord): TransactionDto {
       id: item.id,
       wasteTypeId: item.wasteTypeId,
       wasteTypeName: item.wasteTypeNameSnapshot,
+      condition: item.condition,
       weightKg: item.weightKg.toString(),
       pricePerKg: item.pricePerKgSnapshot.toString(),
       subtotalAmount: item.subtotalAmount.toString(),
@@ -59,9 +60,10 @@ async function assertMember(organizationId: string, memberId: string): Promise<v
 
 async function buildItems(organizationId: string, input: readonly ItemInput[]) {
   const pricedAt = new Date();
+  const uniqueItems = new Set(input.map(({ wasteTypeId, condition }) => `${wasteTypeId}:${condition}`));
   const uniqueIds = new Set(input.map(({ wasteTypeId }) => wasteTypeId));
-  if (uniqueIds.size !== input.length) {
-    throw new InvalidTransactionReferenceError("Each waste type may only appear once per transaction.");
+  if (uniqueItems.size !== input.length) {
+    throw new InvalidTransactionReferenceError("Each waste type and condition combination may only appear once per transaction.");
   }
 
   const wasteTypes = await getPrisma().wasteType.findMany({
@@ -82,16 +84,17 @@ async function buildItems(organizationId: string, input: readonly ItemInput[]) {
   }
 
   const byId = new Map(wasteTypes.map((wasteType) => [wasteType.id, wasteType]));
-  const items = input.map(({ wasteTypeId, weightKg }) => {
+  const items = input.map(({ wasteTypeId, condition, weightKg }) => {
     const wasteType = byId.get(wasteTypeId);
     if (!wasteType) throw new InvalidTransactionReferenceError("Waste type was not found.");
-    const activePrice = wasteType.priceVersions[0];
-    if (!activePrice) throw new InvalidTransactionReferenceError(`Waste type '${wasteType.name}' has no active price.`);
+    const activePrice = wasteType.priceVersions.find((price) => price.condition === condition);
+    if (!activePrice) throw new InvalidTransactionReferenceError(`Waste type '${wasteType.name}' has no active ${condition.toLowerCase()} price.`);
     const weight = new Prisma.Decimal(weightKg);
     const subtotal = weight.mul(activePrice.pricePerKg).toDecimalPlaces(2);
     return {
       wasteTypeId,
       wasteTypeNameSnapshot: wasteType.name,
+      condition,
       weightKg: weight,
       pricePerKgSnapshot: activePrice.pricePerKg,
       subtotalAmount: subtotal,

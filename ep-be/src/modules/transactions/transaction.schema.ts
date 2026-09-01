@@ -2,6 +2,7 @@ import { z } from "zod";
 
 const transactionItemSchema = z.object({
   wasteTypeId: z.uuid(),
+  condition: z.enum(["SORTED", "UNSORTED"]),
   weightKg: z.coerce.number().positive().max(999_999.999),
 });
 

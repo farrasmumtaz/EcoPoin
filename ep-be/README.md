@@ -35,11 +35,17 @@ Semua request memakai cookie hasil `POST /api/auth/login` (`withCredentials: tru
   "clientRequestId": "UUID_UNIK_DARI_CLIENT",
   "source": "DIRECT_ENTRY",
   "notes": "Setoran mingguan",
-  "items": [{ "wasteTypeId": "UUID_JENIS_SAMPAH", "weightKg": 4.25 }]
+  "items": [
+    {
+      "wasteTypeId": "UUID_JENIS_SAMPAH",
+      "condition": "SORTED",
+      "weightKg": 4.25
+    }
+  ]
 }
 ```
 
-Harga tidak diterima dari frontend. Setiap perubahan `pointsPerKg` pada master membuat versi harga baru; transaksi mengambil versi yang aktif lalu menyimpan snapshot rupiah/kg. Penyelesaian memakai `{ "payoutMethod": "DIRECT_CASH" }` atau `{ "payoutMethod": "SAVINGS" }`; hanya `SAVINGS` yang menghasilkan kredit ledger.
+Kategori material tersedia sebagai `PLASTIC`, `PAPER`, `METAL`, `GLASS`, dan `OTHER`. Setiap jenis memiliki harga `SORTED` dan `UNSORTED` yang berversi. Harga tidak diterima dari frontend; transaksi memilih versi aktif sesuai kondisi lalu menyimpan snapshot rupiah/kg. Penyelesaian memakai `{ "payoutMethod": "DIRECT_CASH" }` atau `{ "payoutMethod": "SAVINGS" }`; hanya `SAVINGS` yang menghasilkan kredit ledger.
 
 Urutan status valid: `DRAFT -> FINALIZED -> COMPLETED`. Draft/finalized dapat dibatalkan menjadi `CANCELLED`. Filter daftar: `memberId`, `status`, `dateFrom`, `dateTo`, `page`, dan `limit`.
 

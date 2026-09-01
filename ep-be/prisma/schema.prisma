@@ -23,10 +23,20 @@ enum MemberType {
 }
 
 enum WasteCategory {
-  ORGANIC
-  INORGANIC
+  PLASTIC
+  PAPER
+  METAL
+  GLASS
+  OTHER
 
   @@map("waste_category")
+}
+
+enum WasteCondition {
+  SORTED
+  UNSORTED
+
+  @@map("waste_condition")
 }
 
 enum DepositStatus {
@@ -198,7 +208,6 @@ model WasteType {
   name           String        @db.VarChar(120)
   category       WasteCategory
   unit           String        @default("kg") @db.VarChar(16)
-  pointsPerKg    Decimal       @map("points_per_kg") @db.Decimal(14, 2)
   isActive       Boolean       @default(true) @map("is_active")
   createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
@@ -232,20 +241,21 @@ model ImpactFactor {
 }
 
 model WastePriceVersion {
-  id             String    @id @default(uuid()) @db.Uuid
-  organizationId String    @map("organization_id") @db.Uuid
-  wasteTypeId    String    @map("waste_type_id") @db.Uuid
-  pricePerKg     Decimal   @map("price_per_kg") @db.Decimal(16, 2)
-  effectiveFrom  DateTime  @map("effective_from") @db.Timestamptz(3)
-  effectiveUntil DateTime? @map("effective_until") @db.Timestamptz(3)
-  createdBy      String?   @map("created_by") @db.Uuid
-  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  id             String         @id @default(uuid()) @db.Uuid
+  organizationId String         @map("organization_id") @db.Uuid
+  wasteTypeId    String         @map("waste_type_id") @db.Uuid
+  pricePerKg     Decimal        @map("price_per_kg") @db.Decimal(16, 2)
+  condition      WasteCondition
+  effectiveFrom  DateTime       @map("effective_from") @db.Timestamptz(3)
+  effectiveUntil DateTime?      @map("effective_until") @db.Timestamptz(3)
+  createdBy      String?        @map("created_by") @db.Uuid
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   wasteType    WasteType    @relation(fields: [wasteTypeId], references: [id], onDelete: Restrict)
   creator      Profile?     @relation("WastePriceCreatedBy", fields: [createdBy], references: [id], onDelete: Restrict)
 
-  @@index([organizationId, wasteTypeId, effectiveFrom])
+  @@index([organizationId, wasteTypeId, condition, effectiveFrom])
   @@map("waste_price_versions")
 }
 
@@ -393,18 +403,19 @@ model Transaction {
 }
 
 model TransactionItem {
-  id                    String  @id @default(uuid()) @db.Uuid
-  transactionId         String  @map("transaction_id") @db.Uuid
-  wasteTypeId           String  @map("waste_type_id") @db.Uuid
-  wasteTypeNameSnapshot String  @map("waste_type_name_snapshot") @db.VarChar(120)
-  weightKg              Decimal @map("weight_kg") @db.Decimal(12, 3)
-  pricePerKgSnapshot    Decimal @map("price_per_kg_snapshot") @db.Decimal(16, 2)
-  subtotalAmount        Decimal @map("subtotal_amount") @db.Decimal(18, 2)
+  id                    String         @id @default(uuid()) @db.Uuid
+  transactionId         String         @map("transaction_id") @db.Uuid
+  wasteTypeId           String         @map("waste_type_id") @db.Uuid
+  wasteTypeNameSnapshot String         @map("waste_type_name_snapshot") @db.VarChar(120)
+  condition             WasteCondition
+  weightKg              Decimal        @map("weight_kg") @db.Decimal(12, 3)
+  pricePerKgSnapshot    Decimal        @map("price_per_kg_snapshot") @db.Decimal(16, 2)
+  subtotalAmount        Decimal        @map("subtotal_amount") @db.Decimal(18, 2)
 
   transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
   wasteType   WasteType   @relation(fields: [wasteTypeId], references: [id], onDelete: Restrict)
 
-  @@unique([transactionId, wasteTypeId])
+  @@unique([transactionId, wasteTypeId, condition])
   @@index([wasteTypeId])
   @@map("transaction_items")
 }

@@ -19,7 +19,7 @@ interface AddMemberPayload {
   readonly unitIds: string[];
 }
 
-interface Member {
+export interface Member {
   readonly id: string;
   readonly memberNumber: string;
   readonly fullName: string;
@@ -115,9 +115,7 @@ export async function getMembers(
 ): Promise<{ items: Member[]; pagination: PaginationMeta }> {
   try {
     // NOTE: adjust the endpoint path ("/members") to match your backend.
-    const response = await api.get<GetMembersResponse>("/members", {
-      
-    });
+    const response = await api.get<GetMembersResponse>("/members", { params });
     return response.data.data;
   } catch (error: unknown) {
     throw new Error(extractErrorMessage(error, DEFAULT_ERROR_MESSAGE));

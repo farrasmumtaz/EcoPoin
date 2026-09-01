@@ -1,9 +1,10 @@
-import type { PayoutMethod, TransactionSource, TransactionStatus } from "@/generated/prisma/enums";
+import type { PayoutMethod, TransactionSource, TransactionStatus, WasteCondition } from "@/generated/prisma/enums";
 
 export interface TransactionItemDto {
   readonly id: string;
   readonly wasteTypeId: string;
   readonly wasteTypeName: string;
+  readonly condition: WasteCondition;
   readonly weightKg: string;
   readonly pricePerKg: string;
   readonly subtotalAmount: string;

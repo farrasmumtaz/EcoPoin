@@ -52,7 +52,7 @@ export default function TambahWarga() {
       // no field for it, so it's currently kept local-only and not sent.
       // picName/picPhone/unitIds are unit-only fields with no equivalent
       // in this form, so they're sent as empty/null for an individual.
-      const member = await addMembers({
+      await addMembers({
         fullName: namaWarga.trim(),
         type: "INDIVIDUAL",
         rt: rtWarga.trim() || null,
