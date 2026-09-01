@@ -1,11 +1,14 @@
 "use client";
 
-import { Search, Plus, X, Check, Eye } from "lucide-react";
+import { Search, Plus, Pencil, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 
-import { getWasteTypes } from "@/app/services/waste-types/waste-types"; // adjust to your actual path
+import {
+  deleteWasteType,
+  getWasteTypes,
+} from "@/app/services/waste-types/waste-types";
 
 const PAGE_SIZE = 9;
 
@@ -36,6 +39,7 @@ export default function JenisSampah() {
   const [items, setItems] = useState<WasteTypeRow[]>([]);
   const [totalPages, setTotalPages] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const router = useRouter();
 
@@ -99,6 +103,28 @@ export default function JenisSampah() {
     router.push(
       `/jenis-sampah/edit-jenis-sampah?id=${encodeURIComponent(wasteType.id)}`,
     );
+  };
+
+  const handleDelete = async (wasteType: WasteTypeRow): Promise<void> => {
+    const confirmed = window.confirm(
+      `Hapus jenis sampah "${wasteType.name}"? Data ini tidak akan muncul lagi pada pilihan setoran.`,
+    );
+    if (!confirmed) return;
+
+    setDeletingId(wasteType.id);
+    try {
+      await deleteWasteType(wasteType.id);
+      setItems((currentItems) =>
+        currentItems.filter((item) => item.id !== wasteType.id),
+      );
+      toast.success("Jenis sampah berhasil dihapus.");
+    } catch (error: unknown) {
+      toast.error(
+        error instanceof Error ? error.message : "Jenis sampah gagal dihapus.",
+      );
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   return (
@@ -179,27 +205,24 @@ export default function JenisSampah() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex justify-end gap-2">
-                        {/* NOTE: no confirmed delete/approve endpoints yet —
-                            these are UI-only until wasteTypes.ts has
-                            matching functions. */}
                         <button
-                          aria-label={`Hapus ${sampah.name}`}
-                          className="flex h-8 w-9 items-center justify-center rounded-md border border-danger text-danger transition hover:bg-danger hover:text-white duration-300 cursor-pointer"
-                        >
-                          <X size={15} />
-                        </button>
-                        <button
-                          aria-label={`Setujui ${sampah.name}`}
-                          className="flex h-8 w-9 items-center justify-center rounded-md border border-primary text-primary transition hover:bg-primary hover:text-white duration-300 cursor-pointer"
-                        >
-                          <Check size={15} />
-                        </button>
-                        <button
-                          aria-label={`Lihat ${sampah.name}`}
+                          type="button"
+                          aria-label={`Edit ${sampah.name}`}
                           onClick={() => goToEditJenisSampah(sampah)}
-                          className="flex h-8 w-9 items-center justify-center rounded-md border border-warning text-warning transition hover:bg-warning hover:text-white duration-300 cursor-pointer"
+                          className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-primary px-3 font-semibold text-primary transition duration-300 hover:bg-primary hover:text-white cursor-pointer"
                         >
-                          <Eye size={15} />
+                          <Pencil size={15} />
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={`Hapus ${sampah.name}`}
+                          disabled={deletingId === sampah.id}
+                          onClick={() => void handleDelete(sampah)}
+                          className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-danger px-3 font-semibold text-danger transition duration-300 hover:bg-danger hover:text-white disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+                        >
+                          <Trash2 size={15} />
+                          {deletingId === sampah.id ? "Menghapus..." : "Hapus"}
                         </button>
                       </div>
                     </td>

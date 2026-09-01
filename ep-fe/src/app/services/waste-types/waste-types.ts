@@ -140,3 +140,18 @@ export async function updateWasteType(id: string, payload: UpdateWasteTypePayloa
     throw new Error(extractErrorMessage(error, "Jenis sampah tidak dapat diperbarui."));
   }
 }
+
+type DeleteWasteTypeResponse = ApiSuccessResponse<{ wasteType: WasteType }>;
+
+export async function deleteWasteType(id: string): Promise<WasteType> {
+  try {
+    const response = await api.delete<DeleteWasteTypeResponse>(
+      `/waste-types/${id}`,
+    );
+    return response.data.data.wasteType;
+  } catch (error: unknown) {
+    throw new Error(
+      extractErrorMessage(error, "Jenis sampah tidak dapat dihapus."),
+    );
+  }
+}
