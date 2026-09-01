@@ -23,10 +23,20 @@ enum MemberType {
 }
 
 enum WasteCategory {
-  ORGANIC
-  INORGANIC
+  PLASTIC
+  PAPER
+  METAL
+  GLASS
+  OTHER
 
   @@map("waste_category")
+}
+
+enum WasteCondition {
+  SORTED
+  UNSORTED
+
+  @@map("waste_condition")
 }
 
 enum DepositStatus {
@@ -59,6 +69,39 @@ enum RedemptionStatus {
   @@map("redemption_status")
 }
 
+enum TransactionStatus {
+  DRAFT
+  FINALIZED
+  COMPLETED
+  CANCELLED
+  VOIDED
+
+  @@map("transaction_status")
+}
+
+enum TransactionSource {
+  DIRECT_ENTRY
+  IMPORT
+
+  @@map("transaction_source")
+}
+
+enum PayoutMethod {
+  DIRECT_CASH
+  SAVINGS
+
+  @@map("payout_method")
+}
+
+enum FinancialLedgerEntryType {
+  DEPOSIT
+  WITHDRAWAL
+  REVERSAL
+  ADJUSTMENT
+
+  @@map("financial_ledger_entry_type")
+}
+
 model Organization {
   id                    String   @id @default(uuid()) @db.Uuid
   name                  String   @db.VarChar(160)
@@ -76,6 +119,9 @@ model Organization {
   redemptions         Redemption[]
   auditLogs           AuditLog[]
   memberRelationships MemberRelationship[]
+  transactions        Transaction[]
+  financialLedger     FinancialLedger[]
+  wastePriceVersions  WastePriceVersion[]
 
   @@map("organizations")
 }
@@ -90,12 +136,17 @@ model Profile {
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  organization         Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  createdDeposits      Deposit[]    @relation("DepositCreatedBy")
-  verifiedDeposits     Deposit[]    @relation("DepositVerifiedBy")
-  createdRedemptions   Redemption[] @relation("RedemptionCreatedBy")
-  cancelledRedemptions Redemption[] @relation("RedemptionCancelledBy")
-  auditLogs            AuditLog[]   @relation("AuditActor")
+  organization           Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  createdDeposits        Deposit[]           @relation("DepositCreatedBy")
+  verifiedDeposits       Deposit[]           @relation("DepositVerifiedBy")
+  createdRedemptions     Redemption[]        @relation("RedemptionCreatedBy")
+  cancelledRedemptions   Redemption[]        @relation("RedemptionCancelledBy")
+  auditLogs              AuditLog[]          @relation("AuditActor")
+  createdTransactions    Transaction[]       @relation("TransactionCreatedBy")
+  finalizedTransactions  Transaction[]       @relation("TransactionFinalizedBy")
+  completedTransactions  Transaction[]       @relation("TransactionCompletedBy")
+  financialLedgerEntries FinancialLedger[]   @relation("FinancialLedgerCreatedBy")
+  createdWastePrices     WastePriceVersion[] @relation("WastePriceCreatedBy")
 
   @@index([organizationId, isActive])
   @@map("profiles")
@@ -123,6 +174,8 @@ model Member {
   redemptions             Redemption[]
   individualRelationships MemberRelationship[] @relation("RelationshipIndividual")
   unitRelationships       MemberRelationship[] @relation("RelationshipUnit")
+  transactions            Transaction[]
+  financialLedger         FinancialLedger[]
 
   @@unique([organizationId, memberNumber])
   @@index([organizationId, type, isActive, fullName])
@@ -155,14 +208,15 @@ model WasteType {
   name           String        @db.VarChar(120)
   category       WasteCategory
   unit           String        @default("kg") @db.VarChar(16)
-  pointsPerKg    Decimal       @map("points_per_kg") @db.Decimal(14, 2)
   isActive       Boolean       @default(true) @map("is_active")
   createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  impactFactors ImpactFactor[]
-  depositItems  DepositItem[]
+  organization     Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  impactFactors    ImpactFactor[]
+  depositItems     DepositItem[]
+  transactionItems TransactionItem[]
+  priceVersions    WastePriceVersion[]
 
   @@unique([organizationId, name])
   @@index([organizationId, category, isActive])
@@ -186,6 +240,25 @@ model ImpactFactor {
   @@map("impact_factors")
 }
 
+model WastePriceVersion {
+  id             String         @id @default(uuid()) @db.Uuid
+  organizationId String         @map("organization_id") @db.Uuid
+  wasteTypeId    String         @map("waste_type_id") @db.Uuid
+  pricePerKg     Decimal        @map("price_per_kg") @db.Decimal(16, 2)
+  condition      WasteCondition
+  effectiveFrom  DateTime       @map("effective_from") @db.Timestamptz(3)
+  effectiveUntil DateTime?      @map("effective_until") @db.Timestamptz(3)
+  createdBy      String?        @map("created_by") @db.Uuid
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  wasteType    WasteType    @relation(fields: [wasteTypeId], references: [id], onDelete: Restrict)
+  creator      Profile?     @relation("WastePriceCreatedBy", fields: [createdBy], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, wasteTypeId, condition, effectiveFrom])
+  @@map("waste_price_versions")
+}
+
 model Deposit {
   id              String        @id @default(uuid()) @db.Uuid
   organizationId  String        @map("organization_id") @db.Uuid
@@ -193,7 +266,6 @@ model Deposit {
   status          DepositStatus @default(DRAFT)
   receiptToken    String        @unique @default(uuid()) @map("receipt_token") @db.Uuid
   clientUuid      String        @map("client_uuid") @db.Uuid
-  photoPath       String?       @map("photo_path") @db.Text
   createdBy       String        @map("created_by") @db.Uuid
   verifiedBy      String?       @map("verified_by") @db.Uuid
   verifiedAt      DateTime?     @map("verified_at") @db.Timestamptz(3)
@@ -292,4 +364,81 @@ model AuditLog {
   @@index([organizationId, entityType, entityId])
   @@index([organizationId, createdAt])
   @@map("audit_logs")
+}
+
+model Transaction {
+  id                 String            @id @default(uuid()) @db.Uuid
+  organizationId     String            @map("organization_id") @db.Uuid
+  memberId           String            @map("member_id") @db.Uuid
+  status             TransactionStatus @default(DRAFT)
+  source             TransactionSource @default(DIRECT_ENTRY)
+  payoutMethod       PayoutMethod?     @map("payout_method")
+  clientRequestId    String            @map("client_request_id") @db.Uuid
+  receiptToken       String            @unique @default(uuid()) @map("receipt_token") @db.Uuid
+  notes              String?           @db.VarChar(500)
+  totalWeightKg      Decimal           @default(0) @map("total_weight_kg") @db.Decimal(14, 3)
+  totalAmount        Decimal           @default(0) @map("total_amount") @db.Decimal(18, 2)
+  createdBy          String            @map("created_by") @db.Uuid
+  finalizedBy        String?           @map("finalized_by") @db.Uuid
+  finalizedAt        DateTime?         @map("finalized_at") @db.Timestamptz(3)
+  completedBy        String?           @map("completed_by") @db.Uuid
+  completedAt        DateTime?         @map("completed_at") @db.Timestamptz(3)
+  cancelledAt        DateTime?         @map("cancelled_at") @db.Timestamptz(3)
+  cancellationReason String?           @map("cancellation_reason") @db.VarChar(500)
+  createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization  Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  member        Member            @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  creator       Profile           @relation("TransactionCreatedBy", fields: [createdBy], references: [id], onDelete: Restrict)
+  finalizer     Profile?          @relation("TransactionFinalizedBy", fields: [finalizedBy], references: [id], onDelete: Restrict)
+  completer     Profile?          @relation("TransactionCompletedBy", fields: [completedBy], references: [id], onDelete: Restrict)
+  items         TransactionItem[]
+  ledgerEntries FinancialLedger[]
+
+  @@unique([organizationId, clientRequestId])
+  @@index([organizationId, status, createdAt])
+  @@index([organizationId, memberId, createdAt])
+  @@map("transactions")
+}
+
+model TransactionItem {
+  id                    String         @id @default(uuid()) @db.Uuid
+  transactionId         String         @map("transaction_id") @db.Uuid
+  wasteTypeId           String         @map("waste_type_id") @db.Uuid
+  wasteTypeNameSnapshot String         @map("waste_type_name_snapshot") @db.VarChar(120)
+  condition             WasteCondition
+  weightKg              Decimal        @map("weight_kg") @db.Decimal(12, 3)
+  pricePerKgSnapshot    Decimal        @map("price_per_kg_snapshot") @db.Decimal(16, 2)
+  subtotalAmount        Decimal        @map("subtotal_amount") @db.Decimal(18, 2)
+
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  wasteType   WasteType   @relation(fields: [wasteTypeId], references: [id], onDelete: Restrict)
+
+  @@unique([transactionId, wasteTypeId, condition])
+  @@index([wasteTypeId])
+  @@map("transaction_items")
+}
+
+model FinancialLedger {
+  id             String                   @id @default(uuid()) @db.Uuid
+  organizationId String                   @map("organization_id") @db.Uuid
+  memberId       String                   @map("member_id") @db.Uuid
+  transactionId  String?                  @map("transaction_id") @db.Uuid
+  entryType      FinancialLedgerEntryType @map("entry_type")
+  amount         Decimal                  @db.Decimal(18, 2)
+  referenceKey   String                   @map("reference_key") @db.VarChar(160)
+  notes          String?                  @db.VarChar(500)
+  createdBy      String                   @map("created_by") @db.Uuid
+  createdAt      DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  member       Member       @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  transaction  Transaction? @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+  creator      Profile      @relation("FinancialLedgerCreatedBy", fields: [createdBy], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, referenceKey])
+  @@index([organizationId, memberId, createdAt])
+  @@index([transactionId])
+  @@map("financial_ledger")
 }

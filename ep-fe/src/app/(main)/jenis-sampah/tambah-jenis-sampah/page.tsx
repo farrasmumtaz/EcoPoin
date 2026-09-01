@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, FormEvent } from "react";
 import toast from "react-hot-toast";
 
-import { addWasteType } from "@/app/services/waste-types/waste-types"; // adjust to your actual path
+import { addWasteType, type WasteCategory } from "@/app/services/waste-types/waste-types";
 
 interface FormFieldLabelProps {
   children: React.ReactNode;
@@ -22,37 +22,43 @@ function FormFieldLabel({ children }: FormFieldLabelProps) {
 // NOTE: "B3" was in the original mock options but has no confirmed backend
 // value yet — removed rather than risk a rejected request. Add it back
 // (and to WasteCategory in wasteTypes.ts) once confirmed.
-const kategoriOptions: { label: string; value: "ORGANIC" | "INORGANIC" }[] = [
-  { label: "Organik", value: "ORGANIC" },
-  { label: "Anorganik", value: "INORGANIC" },
+const kategoriOptions: { label: string; value: WasteCategory }[] = [
+  { label: "Plastik", value: "PLASTIC" },
+  { label: "Kertas", value: "PAPER" },
+  { label: "Logam", value: "METAL" },
+  { label: "Kaca", value: "GLASS" },
+  { label: "Lain-lain", value: "OTHER" },
 ];
 
 export default function TambahJenisSampah() {
   const [namaJenisSampah, setNamaJenisSampah] = useState("");
-  const [kategori, setKategori] = useState<"ORGANIC" | "INORGANIC" | "">("");
-  const [satuanUnit, setSatuanUnit] = useState("");
-  const [hargaPerKg, setHargaPerKg] = useState("");
+  const [kategori, setKategori] = useState<WasteCategory | "">("");
+  const [satuanUnit, setSatuanUnit] = useState("kg");
+  const [sortedPricePerKg, setSortedPricePerKg] = useState("");
+  const [unsortedPricePerKg, setUnsortedPricePerKg] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
 
   const resetForm = () => {
     setNamaJenisSampah("");
     setKategori("");
-    setSatuanUnit("");
-    setHargaPerKg("");
+    setSatuanUnit("kg");
+    setSortedPricePerKg("");
+    setUnsortedPricePerKg("");
   };
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    if (!namaJenisSampah.trim() || !kategori || !satuanUnit.trim() || !hargaPerKg) {
+    if (!namaJenisSampah.trim() || !kategori || !satuanUnit.trim() || !sortedPricePerKg || !unsortedPricePerKg) {
       toast.error("Semua kolom wajib diisi.");
       return;
     }
 
-    const pointsPerKgNumber = Number(hargaPerKg);
-    if (Number.isNaN(pointsPerKgNumber)) {
-      toast.error("Harga/Kg harus berupa angka.");
+    const sortedPrice = Number(sortedPricePerKg);
+    const unsortedPrice = Number(unsortedPricePerKg);
+    if (sortedPrice <= 0 || unsortedPrice <= 0) {
+      toast.error("Kedua harga harus lebih dari nol.");
       return;
     }
 
@@ -63,7 +69,8 @@ export default function TambahJenisSampah() {
         name: namaJenisSampah.trim(),
         category: kategori,
         unit: satuanUnit.trim(),
-        pointsPerKg: pointsPerKgNumber,
+        sortedPricePerKg: sortedPrice,
+        unsortedPricePerKg: unsortedPrice,
       });
 
       toast.success(`Jenis sampah "${wasteType.name}" berhasil ditambahkan.`);
@@ -99,14 +106,14 @@ export default function TambahJenisSampah() {
         </div>
 
         {/* Kategori / Satuan Unit / Harga per Kg */}
-        <div className="mb-6 grid grid-cols-1 gap-6 md:grid-cols-3">
+        <div className="mb-6 grid grid-cols-1 gap-6 md:grid-cols-4">
           <div>
             <FormFieldLabel>Kategori</FormFieldLabel>
             <div className="relative">
               <select
                 value={kategori}
                 onChange={(e) =>
-                  setKategori(e.target.value as "ORGANIC" | "INORGANIC" | "")
+                  setKategori(e.target.value as WasteCategory | "")
                 }
                 className={selectClass}
               >
@@ -138,11 +145,23 @@ export default function TambahJenisSampah() {
           </div>
 
           <div>
-            <FormFieldLabel>Harga/Kg (Rp)</FormFieldLabel>
+            <FormFieldLabel>Harga Dipilah/Kg (Rp)</FormFieldLabel>
             <input
               type="number"
-              value={hargaPerKg}
-              onChange={(e) => setHargaPerKg(e.target.value)}
+              min="1"
+              value={sortedPricePerKg}
+              onChange={(e) => setSortedPricePerKg(e.target.value)}
+              className={inputClass}
+            />
+          </div>
+
+          <div>
+            <FormFieldLabel>Harga Belum Dipilah/Kg (Rp)</FormFieldLabel>
+            <input
+              type="number"
+              min="1"
+              value={unsortedPricePerKg}
+              onChange={(e) => setUnsortedPricePerKg(e.target.value)}
               className={inputClass}
             />
           </div>

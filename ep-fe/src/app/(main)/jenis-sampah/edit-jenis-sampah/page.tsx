@@ -1,162 +1,128 @@
 "use client";
 
-import { ChevronDown } from "lucide-react";
+import { ArrowLeft, ChevronDown, Save } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useMemo, FormEvent, Suspense } from "react";
+import { FormEvent, Suspense, useEffect, useState } from "react";
+import toast from "react-hot-toast";
 
-interface FormFieldLabelProps {
-  children: React.ReactNode;
-}
+import { getWasteTypeById, updateWasteType, type WasteCategory } from "@/app/services/waste-types/waste-types";
 
-function FormFieldLabel({ children }: FormFieldLabelProps) {
-  return (
-    <label className="mb-2 block text-sm font-bold text-font">{children}</label>
-  );
-}
+const categories: readonly { readonly value: WasteCategory; readonly label: string }[] = [
+  { value: "PLASTIC", label: "Plastik" },
+  { value: "PAPER", label: "Kertas" },
+  { value: "METAL", label: "Logam" },
+  { value: "GLASS", label: "Kaca" },
+  { value: "OTHER", label: "Lain-lain" },
+];
 
-// ---------- Static options (replace with real data / API calls) ----------
-const kategoriOptions = ["Organik", "Anorganik", "B3"];
-
-function EditJenisSampahForm() {
+function EditForm() {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const id = useSearchParams().get("id") ?? "";
+  const [name, setName] = useState("");
+  const [category, setCategory] = useState<WasteCategory>("PLASTIC");
+  const [unit, setUnit] = useState("kg");
+  const [sortedPrice, setSortedPrice] = useState("");
+  const [unsortedPrice, setUnsortedPrice] = useState("");
+  const [isLoading, setIsLoading] = useState(Boolean(id));
+  const [isSaving, setIsSaving] = useState(false);
 
-  // Snapshot of the data passed in via query params from the Jenis Sampah
-  // table. "Ulang" restores the form to this snapshot instead of clearing it.
-  const originalData = useMemo(
-    () => ({
-      namaJenisSampah: searchParams.get("nama") ?? "",
-      kategori: searchParams.get("kategori") ?? "",
-      satuanUnit: searchParams.get("satuan") ?? "",
-      hargaPerKg: searchParams.get("hargaPerKg") ?? "",
-    }),
-    [searchParams],
-  );
+  useEffect(() => {
+    if (!id) {
+      toast.error("ID jenis sampah tidak valid.");
+      return;
+    }
+    void getWasteTypeById(id)
+      .then((wasteType) => {
+        setName(wasteType.name);
+        setCategory(wasteType.category);
+        setUnit(wasteType.unit);
+        setSortedPrice(wasteType.prices.sorted);
+        setUnsortedPrice(wasteType.prices.unsorted);
+      })
+      .catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Data gagal dimuat."))
+      .finally(() => setIsLoading(false));
+  }, [id]);
 
-  const [namaJenisSampah, setNamaJenisSampah] = useState(
-    originalData.namaJenisSampah,
-  );
-  const [kategori, setKategori] = useState(originalData.kategori);
-  const [satuanUnit, setSatuanUnit] = useState(originalData.satuanUnit);
-  const [hargaPerKg, setHargaPerKg] = useState(originalData.hargaPerKg);
-
-  const resetForm = () => {
-    setNamaJenisSampah(originalData.namaJenisSampah);
-    setKategori(originalData.kategori);
-    setSatuanUnit(originalData.satuanUnit);
-    setHargaPerKg(originalData.hargaPerKg);
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
+    event.preventDefault();
+    if (!id || !name.trim() || !unit.trim() || Number(sortedPrice) < 0 || Number(unsortedPrice) < 0) {
+      toast.error("Lengkapi data dan pastikan harga tidak bernilai negatif.");
+      return;
+    }
+    setIsSaving(true);
+    try {
+      await updateWasteType(id, {
+        name: name.trim(),
+        category,
+        unit: unit.trim(),
+        sortedPricePerKg: Number(sortedPrice),
+        unsortedPricePerKg: Number(unsortedPrice),
+      });
+      toast.success("Jenis sampah berhasil diperbarui.");
+      router.push("/jenis-sampah");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Data gagal diperbarui.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    // TODO: call API to persist updated jenis sampah data
-    console.log({ namaJenisSampah, kategori, satuanUnit, hargaPerKg });
-  };
+  const inputClass = "h-12 w-full rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-primary focus:ring-4 focus:ring-primary/10 disabled:cursor-not-allowed disabled:bg-gray-100";
+  const labelClass = "mb-2 block text-sm font-semibold text-gray-800";
 
-  const inputClass =
-    "w-full rounded-md bg-placeholder/50 px-4 py-3 text-sm text-font placeholder:text-font/50 outline-none focus:ring-2 focus:ring-primary transition duration-300";
-
-  const selectClass =
-    "w-full appearance-none rounded-md bg-placeholder/50 px-4 py-3 pr-10 text-sm text-font outline-none focus:ring-2 focus:ring-primary transition duration-300";
+  if (isLoading) {
+    return <div className="p-8 text-sm font-medium text-gray-500">Memuat data jenis sampah...</div>;
+  }
 
   return (
-    <div className="min-h-full bg-white rounded-md p-6">
-      <form onSubmit={handleSubmit}>
-        {/* Nama Jenis Sampah */}
+    <div className="min-h-full bg-gray-50 p-6 md:p-8">
+      <div className="mx-auto max-w-5xl">
         <div className="mb-6">
-          <FormFieldLabel>Nama Jenis Sampah</FormFieldLabel>
-          <input
-            type="text"
-            value={namaJenisSampah}
-            onChange={(e) => setNamaJenisSampah(e.target.value)}
-            placeholder="Isi nama jenis sampah"
-            className={inputClass}
-          />
+          <button type="button" onClick={() => router.back()} className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-gray-600 transition hover:text-primary cursor-pointer">
+            <ArrowLeft size={18} /> Kembali
+          </button>
+          <h1 className="text-2xl font-bold text-gray-900">Edit Jenis Sampah</h1>
+          <p className="mt-1 text-sm text-gray-500">Perbarui kategori, satuan, dan harga beli berdasarkan kondisi pemilahan.</p>
         </div>
 
-        {/* Kategori / Satuan Unit / Harga per Kg */}
-        <div className="mb-6 grid grid-cols-1 gap-6 md:grid-cols-3">
+        <form onSubmit={handleSubmit} className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm md:p-8">
+          <div className="mb-6">
+            <label className={labelClass}>Nama Jenis Sampah</label>
+            <input value={name} onChange={(event) => setName(event.target.value)} className={inputClass} placeholder="Contoh: Botol Plastik PET" />
+          </div>
+
+          <div className="mb-6 grid grid-cols-1 gap-5 md:grid-cols-2">
           <div>
-            <FormFieldLabel>Kategori</FormFieldLabel>
+            <label className={labelClass}>Kategori</label>
             <div className="relative">
-              <select
-                value={kategori}
-                onChange={(e) => setKategori(e.target.value)}
-                className={selectClass}
-              >
-                <option value="" disabled>
-                  Pilih kategori
-                </option>
-                {kategoriOptions.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {opt}
-                  </option>
-                ))}
+              <select value={category} onChange={(event) => setCategory(event.target.value as WasteCategory)} className={`${inputClass} appearance-none pr-10`}>
+                {categories.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
               </select>
-              <ChevronDown
-                size={18}
-                className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-font/60"
-              />
+              <ChevronDown size={18} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-gray-500" />
+            </div>
+          </div>
+            <div><label className={labelClass}>Satuan</label><input value={unit} onChange={(event) => setUnit(event.target.value)} className={inputClass} placeholder="kg" /></div>
+          </div>
+
+          <div className="mb-8 rounded-xl border border-gray-200 bg-gray-50 p-5">
+            <h2 className="mb-1 font-bold text-gray-900">Harga beli per kilogram</h2>
+            <p className="mb-5 text-sm text-gray-500">Isi 0 apabila jenis sampah belum memiliki harga pada kondisi tersebut.</p>
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+              <div><label className={labelClass}>Sudah Dipilah</label><div className="relative"><span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-gray-500">Rp</span><input type="number" min="0" step="1" value={sortedPrice} onChange={(event) => setSortedPrice(event.target.value)} className={`${inputClass} pl-11 pr-14`} /><span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-gray-500">/kg</span></div></div>
+              <div><label className={labelClass}>Belum Dipilah</label><div className="relative"><span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-gray-500">Rp</span><input type="number" min="0" step="1" value={unsortedPrice} onChange={(event) => setUnsortedPrice(event.target.value)} className={`${inputClass} pl-11 pr-14`} /><span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-gray-500">/kg</span></div></div>
             </div>
           </div>
 
-          <div>
-            <FormFieldLabel>Satuan Unit</FormFieldLabel>
-            <input
-              type="text"
-              value={satuanUnit}
-              onChange={(e) => setSatuanUnit(e.target.value)}
-              placeholder="Isi satuan unit"
-              className={inputClass}
-            />
+          <div className="flex flex-col-reverse gap-3 border-t border-gray-200 pt-6 sm:flex-row sm:justify-end">
+            <button type="button" onClick={() => router.back()} className="h-11 rounded-lg border border-gray-300 bg-white px-6 font-semibold text-gray-700 transition hover:bg-gray-50 cursor-pointer">Batal</button>
+            <button type="submit" disabled={isSaving} className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-primary px-6 font-semibold text-white transition hover:bg-primary/85 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"><Save size={18} />{isSaving ? "Menyimpan..." : "Simpan Perubahan"}</button>
           </div>
-
-          <div>
-            <FormFieldLabel>Harga/Kg (Rp)</FormFieldLabel>
-            <input
-              type="number"
-              value={hargaPerKg}
-              onChange={(e) => setHargaPerKg(e.target.value)}
-              className={inputClass}
-            />
-          </div>
-        </div>
-
-        {/* Actions */}
-        <div className="flex items-center gap-4">
-          <button
-            type="button"
-            onClick={() => router.back()}
-            className="rounded-md bg-placeholder px-8 py-3 font-semibold text-white transition hover:opacity-75 cursor-pointer duration-300"
-          >
-            Kembali
-          </button>
-          <button
-            type="button"
-            onClick={resetForm}
-            className="rounded-md bg-danger px-8 py-3 text-sm font-semibold text-white transition hover:opacity-75 cursor-pointer duration-300"
-          >
-            Ulang
-          </button>
-          <button
-            type="submit"
-            className="rounded-md bg-primary px-8 py-3 text-sm font-semibold text-white transition hover:opacity-75 cursor-pointer duration-300"
-          >
-            Simpan
-          </button>
-        </div>
-      </form>
+        </form>
+      </div>
     </div>
   );
 }
 
-// useSearchParams() opts the tree into client-side rendering unless wrapped
-// in Suspense, so the actual page default-exports a Suspense boundary
-// around the form rather than using useSearchParams directly here.
 export default function EditJenisSampah() {
-  return (
-    <Suspense fallback={null}>
-      <EditJenisSampahForm />
-    </Suspense>
-  );
+  return <Suspense fallback={<div className="p-8 text-sm text-gray-500">Memuat halaman...</div>}><EditForm /></Suspense>;
 }

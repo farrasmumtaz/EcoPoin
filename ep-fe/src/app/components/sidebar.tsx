@@ -3,6 +3,7 @@
 import {
   ChevronLeft,
   ChevronRight,
+  CircleUserRound,
   CircleDollarSign,
   FileText,
   HandCoins,
@@ -13,7 +14,9 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { logoutUser } from "../services/auth/authUser";
+import toast from "react-hot-toast";
+
+import { useAuthStore } from "../services/auth/authStore";
 
 interface MenuItem {
   label: string;
@@ -49,6 +52,24 @@ export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
+  const logout = useAuthStore((state) => state.logout);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const handleLogout = async (): Promise<void> => {
+    if (isLoggingOut) return;
+    setIsLoggingOut(true);
+    try {
+      await logout();
+      toast.success("Berhasil logout.");
+      router.replace("/login");
+      router.refresh();
+    } catch {
+      toast.error("Sesi lokal dihapus, tetapi server tidak dapat dihubungi.");
+      router.replace("/login");
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
 
   return (
     <aside
@@ -124,11 +145,7 @@ export default function Sidebar() {
               className="flex flex-1 items-center gap-3 min-w-0 cursor-pointer text-left"
               aria-label="Lihat profil"
             >
-              <img
-                src="/avatar-placeholder.jpg"
-                alt="User avatar"
-                className="w-10 h-10 rounded-full object-cover shrink-0"
-              />
+              <CircleUserRound className="h-10 w-10 shrink-0 text-neutral-500" aria-label="User avatar" />
               <div className="flex-1 min-w-0">
                 <p className="text-xs text-neutral-500 leading-tight">RT.2</p>
                 <p className="text-sm font-semibold text-neutral-800 leading-tight truncate">
@@ -137,7 +154,8 @@ export default function Sidebar() {
               </div>
             </button>
             <button
-              onClick={() => router.push("/login")}
+              onClick={handleLogout}
+              disabled={isLoggingOut}
               className="w-8 h-8 flex items-center justify-center rounded-lg bg-neutral-900 text-white hover:bg-neutral-700 transition cursor-pointer shrink-0"
               aria-label="Logout"
             >
@@ -151,14 +169,11 @@ export default function Sidebar() {
               className="cursor-pointer"
               aria-label="Lihat profil"
             >
-              <img
-                src="/avatar-placeholder.jpg"
-                alt="User avatar"
-                className="w-10 h-10 rounded-full object-cover"
-              />
+              <CircleUserRound className="h-10 w-10 text-neutral-500" aria-label="User avatar" />
             </button>
             <button
-              onClick={() => logoutUser()}
+              onClick={handleLogout}
+              disabled={isLoggingOut}
               className="w-9 h-9 flex items-center justify-center rounded-lg bg-neutral-900 text-white hover:bg-neutral-700 transition cursor-pointer"
               aria-label="Logout"
             >

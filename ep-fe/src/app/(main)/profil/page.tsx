@@ -1,7 +1,7 @@
 "use client";
 
-import { Users, Home, Phone, Camera } from "lucide-react";
-import { useState, useEffect, useMemo, useRef, FormEvent } from "react";
+import { Users, Home, Phone } from "lucide-react";
+import { useState, FormEvent } from "react";
 
 interface FormFieldLabelProps {
   icon?: React.ReactNode;
@@ -23,7 +23,6 @@ const initialProfile = {
   rtWarga: "RT 2",
   noTelp: "081231231331231",
   catatan: "",
-  fotoUrl: "/avatar-placeholder.jpg",
 };
 
 export default function Profile() {
@@ -32,47 +31,17 @@ export default function Profile() {
   const [noTelp, setNoTelp] = useState(initialProfile.noTelp);
   const [catatan, setCatatan] = useState(initialProfile.catatan);
 
-  // Draft photo — only held in memory until the form is submitted.
-  const [fotoFile, setFotoFile] = useState<File | null>(null);
-  const fotoInputRef = useRef<HTMLInputElement>(null);
-  const fotoPreviewUrl = useMemo(
-    () => (fotoFile ? URL.createObjectURL(fotoFile) : initialProfile.fotoUrl),
-    [fotoFile],
-  );
-
-  // Build/revoke an object URL whenever a new draft photo is picked, so we
-  // preview the selected file without uploading anything yet.
-  useEffect(() => {
-    if (!fotoFile) return;
-    return () => URL.revokeObjectURL(fotoPreviewUrl);
-  }, [fotoFile, fotoPreviewUrl]);
-
-  const handleFotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] ?? null;
-    setFotoFile(file);
-    // allow re-selecting the same file later
-    e.target.value = "";
-  };
-
   const resetForm = () => {
     setNamaWarga(initialProfile.namaWarga);
     setRtWarga(initialProfile.rtWarga);
     setNoTelp(initialProfile.noTelp);
     setCatatan(initialProfile.catatan);
-    setFotoFile(null);
   };
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     // TODO: call API to persist updated profile data.
-    // fotoFile is only sent here, on submit — e.g.:
-    // const formData = new FormData();
-    // formData.append("namaWarga", namaWarga);
-    // formData.append("rtWarga", rtWarga);
-    // formData.append("noTelp", noTelp);
-    // formData.append("catatan", catatan);
-    // if (fotoFile) formData.append("foto", fotoFile);
-    console.log({ namaWarga, rtWarga, noTelp, catatan, fotoFile });
+    console.log({ namaWarga, rtWarga, noTelp, catatan });
   };
 
   const inputClass =
@@ -80,41 +49,7 @@ export default function Profile() {
 
   return (
     <div className="min-h-full bg-white rounded-md p-6">
-      <form onSubmit={handleSubmit} className="flex flex-col gap-8 md:flex-row">
-          {/* Avatar — click to pick a new profile photo (draft until Simpan) */}
-          <div className="shrink-0">
-            <button
-              type="button"
-              onClick={() => fotoInputRef.current?.click()}
-              className="group relative block h-60 w-60 cursor-pointer overflow-hidden rounded-full border border-gray-200"
-              aria-label="Ganti foto profil"
-            >
-              <img
-                src={fotoPreviewUrl}
-                alt="Foto profil"
-                className="h-full w-full object-cover"
-              />
-              <span className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/0 text-transparent transition duration-300 group-hover:bg-black/40 group-hover:text-white">
-                <Camera size={28} />
-                <span className="text-sm font-semibold">Ganti Foto</span>
-              </span>
-            </button>
-            <input
-              ref={fotoInputRef}
-              type="file"
-              accept=".jpg,.jpeg,.png,image/jpeg,image/png"
-              className="hidden"
-              onChange={handleFotoChange}
-            />
-            {fotoFile && (
-              <p className="mt-2 max-w-60 truncate text-center text-xs text-font/60">
-                {fotoFile.name}
-              </p>
-            )}
-          </div>
-
-          {/* Form fields */}
-          <div className="flex-1">
+      <form onSubmit={handleSubmit}>
           {/* Nama Warga */}
           <div className="mb-6">
             <FormFieldLabel icon={<Users size={18} />}>
@@ -183,7 +118,6 @@ export default function Profile() {
             >
               Simpan
             </button>
-          </div>
           </div>
         </form>
     </div>

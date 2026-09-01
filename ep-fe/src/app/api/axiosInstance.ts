@@ -13,3 +13,18 @@ export const api = axios.create({
     "Content-Type": "application/json",
   },
 });
+
+api.interceptors.response.use(
+  (response) => response,
+  (error: unknown) => {
+    if (
+      axios.isAxiosError(error) &&
+      error.response?.status === 401 &&
+      typeof window !== "undefined" &&
+      !error.config?.url?.startsWith("/auth/")
+    ) {
+      window.location.replace("/login");
+    }
+    return Promise.reject(error);
+  },
+);

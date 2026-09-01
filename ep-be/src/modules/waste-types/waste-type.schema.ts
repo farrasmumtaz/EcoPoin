@@ -1,14 +1,15 @@
 import { z } from "zod";
 
 const nameSchema = z.string().trim().min(2).max(120);
-const pointsPerKgSchema = z.coerce.number().positive().max(999_999_999_999.99);
+const pricePerKgSchema = z.coerce.number().positive().max(999_999_999_999.99);
 
-export const wasteCategorySchema = z.enum(["ORGANIC", "INORGANIC"]);
+export const wasteCategorySchema = z.enum(["PLASTIC", "PAPER", "METAL", "GLASS", "OTHER"]);
 
 export const createWasteTypeSchema = z.object({
   name: nameSchema,
   category: wasteCategorySchema,
-  pointsPerKg: pointsPerKgSchema,
+  sortedPricePerKg: pricePerKgSchema,
+  unsortedPricePerKg: pricePerKgSchema,
   unit: z.string().trim().min(1).max(16).default("kg"),
 });
 

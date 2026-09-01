@@ -2,27 +2,25 @@ import axios from "axios";
 
 import { api } from "@/app/api/axiosInstance";
 
-// NOTE: "INORGANIC" is confirmed from a real response; other categories
-// (e.g. "ORGANIC") are a guess — confirm the full set with your backend
-// and tighten this union accordingly.
-type WasteCategory = "ORGANIC" | "INORGANIC";
+export type WasteCategory = "PLASTIC" | "PAPER" | "METAL" | "GLASS" | "OTHER";
 
 interface AddWasteTypePayload {
   readonly name: string;
   readonly category: WasteCategory;
   readonly unit: string;
-  readonly pointsPerKg: number;
+  readonly sortedPricePerKg: number;
+  readonly unsortedPricePerKg: number;
 }
 
-interface WasteType {
+export interface WasteType {
   readonly id: string;
   readonly name: string;
   readonly category: WasteCategory;
   readonly unit: string;
-  // NOTE: confirmed from a real response — the backend returns this as a
-  // string (likely a serialized Decimal) even though it's sent as a
-  // number in the create payload. Don't assume it round-trips as a number.
-  readonly pointsPerKg: string;
+  readonly prices: {
+    readonly sorted: string;
+    readonly unsorted: string;
+  };
   readonly isActive: boolean;
   readonly createdAt: string;
   readonly updatedAt: string;
@@ -129,5 +127,31 @@ export async function getWasteTypeById(id: string): Promise<WasteType> {
     return response.data.data.wasteType;
   } catch (error: unknown) {
     throw new Error(extractErrorMessage(error, DEFAULT_ERROR_MESSAGE));
+  }
+}
+
+type UpdateWasteTypePayload = Partial<AddWasteTypePayload> & { readonly isActive?: boolean };
+
+export async function updateWasteType(id: string, payload: UpdateWasteTypePayload): Promise<WasteType> {
+  try {
+    const response = await api.patch<GetWasteTypeByIdResponse>(`/waste-types/${id}`, payload);
+    return response.data.data.wasteType;
+  } catch (error: unknown) {
+    throw new Error(extractErrorMessage(error, "Jenis sampah tidak dapat diperbarui."));
+  }
+}
+
+type DeleteWasteTypeResponse = ApiSuccessResponse<{ wasteType: WasteType }>;
+
+export async function deleteWasteType(id: string): Promise<WasteType> {
+  try {
+    const response = await api.delete<DeleteWasteTypeResponse>(
+      `/waste-types/${id}`,
+    );
+    return response.data.data.wasteType;
+  } catch (error: unknown) {
+    throw new Error(
+      extractErrorMessage(error, "Jenis sampah tidak dapat dihapus."),
+    );
   }
 }
