@@ -20,7 +20,7 @@ export async function POST(request: Request): Promise<Response> {
   try {
     const user = await requireRole(["ADMIN"]);
     const input = parseSchema(createWasteTypeSchema, await request.json());
-    const wasteType = await createWasteType(user.organizationId, input);
+    const wasteType = await createWasteType(user.organizationId, user.id, input);
     return successResponse({ wasteType }, { status: 201 });
   } catch (error: unknown) {
     return errorResponse(error);

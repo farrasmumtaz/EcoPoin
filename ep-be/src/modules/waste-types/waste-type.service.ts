@@ -94,18 +94,24 @@ export async function getWasteType(
 
 export async function createWasteType(
   organizationId: string,
+  actorId: string,
   input: CreateWasteTypeInput,
 ): Promise<WasteTypeDto> {
   await assertNameAvailable(organizationId, input.name);
   const prisma = getPrisma();
   const wasteType = await prisma.wasteType.create({
-    data: { organizationId, ...input },
+    data: {
+      organizationId,
+      ...input,
+      priceVersions: { create: { organizationId, pricePerKg: input.pointsPerKg, effectiveFrom: new Date(), createdBy: actorId } },
+    },
   });
   return toDto(wasteType);
 }
 
 export async function updateWasteType(
   organizationId: string,
+  actorId: string,
   id: string,
   input: UpdateWasteTypeInput,
 ): Promise<WasteTypeDto> {
@@ -113,9 +119,23 @@ export async function updateWasteType(
   if (input.name) await assertNameAvailable(organizationId, input.name, id);
 
   const prisma = getPrisma();
-  const wasteType = await prisma.wasteType.update({
-    where: { id },
-    data: input,
+  const wasteType = await prisma.$transaction(async (tx) => {
+    const changedAt = new Date();
+    if (input.pointsPerKg !== undefined) {
+      await tx.wastePriceVersion.updateMany({
+        where: { organizationId, wasteTypeId: id, effectiveUntil: null },
+        data: { effectiveUntil: changedAt },
+      });
+    }
+    return tx.wasteType.update({
+      where: { id },
+      data: {
+        ...input,
+        ...(input.pointsPerKg !== undefined
+          ? { priceVersions: { create: { organizationId, pricePerKg: input.pointsPerKg, effectiveFrom: changedAt, createdBy: actorId } } }
+          : {}),
+      },
+    });
   });
   return toDto(wasteType);
 }

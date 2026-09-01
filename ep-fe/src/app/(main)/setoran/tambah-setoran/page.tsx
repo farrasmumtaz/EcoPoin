@@ -1,6 +1,6 @@
 "use client";
 
-import { Users, Recycle, ChevronDown, Camera, Plus } from "lucide-react";
+import { Users, Recycle, ChevronDown, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useRef, FormEvent } from "react";
 
@@ -15,7 +15,6 @@ interface ItemEntry {
   jenisSampah: string;
   berat: string;
   hargaPerKg: string;
-  foto: File | null;
 }
 
 // ---------- Static options (replace with real data / API calls) ----------
@@ -27,7 +26,6 @@ function createEmptyItem(id: string): ItemEntry {
     jenisSampah: "",
     berat: "",
     hargaPerKg: "",
-    foto: null,
   };
 }
 
@@ -140,7 +138,7 @@ export default function TambahSetoran() {
         )}
 
         {/* Repeatable item blocks */}
-        {items.map((item, index) => (
+        {items.map((item) => (
           <div key={item.id} className="mb-6">
             <div className="mb-6 grid grid-cols-1 gap-6 md:grid-cols-3">
               <div>
@@ -196,27 +194,6 @@ export default function TambahSetoran() {
               </div>
             </div>
 
-            {/* Foto Bukti upload */}
-            <label
-              htmlFor={`foto-bukti-${item.id}`}
-              className="flex min-h-40 cursor-pointer flex-col items-center justify-center gap-2 rounded-md bg-placeholder/50 py-10 text-font/70 transition hover:bg-placeholder/70 duration-300"
-            >
-              <Camera size={40} strokeWidth={1.5} />
-              <span className="text-sm font-bold text-font/80">
-                {item.foto ? item.foto.name : "Foto Bukti"}
-              </span>
-              <input
-                id={`foto-bukti-${item.id}`}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) =>
-                  updateItem(item.id, {
-                    foto: e.target.files?.[0] ?? null,
-                  })
-                }
-              />
-            </label>
           </div>
         ))}
 
