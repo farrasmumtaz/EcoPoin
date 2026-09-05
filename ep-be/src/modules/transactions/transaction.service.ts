@@ -1,70 +1,121 @@
 import { Prisma } from "@/generated/prisma/client";
 import { getPrisma } from "@/infrastructure/database/prisma";
-import { creditLedger } from "@/modules/ledger/ledger.service";
 import {
-  TransactionEmptyError,
-  TransactionNotCancellableError,
-  TransactionNotDraftError,
-  TransactionNotFinalizedError,
+  InvalidTransactionReferenceError,
+  InvalidTransactionStateError,
   TransactionNotFoundError,
 } from "@/modules/transactions/transaction.errors";
 import type {
   CancelTransactionInput,
+  CompleteTransactionInput,
+  CreateTransactionInput,
   ListTransactionsInput,
-  SettleTransactionInput,
+  UpdateTransactionInput,
 } from "@/modules/transactions/transaction.schema";
-import type {
-  PaginatedTransactions,
-  TransactionDto,
-  TransactionItemDto,
-} from "@/modules/transactions/transaction.types";
+import type { PaginatedTransactions, TransactionDto } from "@/modules/transactions/transaction.types";
 
-const transactionRelations = {
-  member: { select: { memberNumber: true, fullName: true } },
-  items: { include: { wasteType: { select: { name: true } } } },
+const transactionInclude = {
+  member: { select: { fullName: true } },
+  items: { orderBy: { wasteTypeNameSnapshot: "asc" as const } },
 } satisfies Prisma.TransactionInclude;
 
-type TransactionWithRelations = Prisma.TransactionGetPayload<{
-  include: typeof transactionRelations;
-}>;
+type TransactionRecord = Prisma.TransactionGetPayload<{ include: typeof transactionInclude }>;
+type ItemInput = CreateTransactionInput["items"][number];
 
-function toDto(transaction: TransactionWithRelations): TransactionDto {
-  const items: TransactionItemDto[] = transaction.items.map((item) => ({
-    id: item.id,
-    wasteTypeId: item.wasteTypeId,
-    wasteTypeName: item.wasteType.name,
-    weightKg: item.weightKg.toString(),
-    pricePerKgSnapshot: item.pricePerKgSnapshot.toString(),
-    subtotalRupiah: item.subtotalRupiah.toString(),
-  }));
+function toDto(record: TransactionRecord): TransactionDto {
+  return {
+    id: record.id,
+    memberId: record.memberId,
+    memberName: record.member.fullName,
+    status: record.status,
+    source: record.source,
+    payoutMethod: record.payoutMethod,
+    receiptToken: record.receiptToken,
+    receiptNumber: record.receiptNumber,
+    notes: record.notes,
+    totalWeightKg: record.totalWeightKg.toString(),
+    totalAmount: record.totalAmount.toString(),
+    items: record.items.map((item) => ({
+      id: item.id,
+      wasteTypeId: item.wasteTypeId,
+      wasteTypeName: item.wasteTypeNameSnapshot,
+      condition: item.condition,
+      weightKg: item.weightKg.toString(),
+      pricePerKg: item.pricePerKgSnapshot.toString(),
+      subtotalAmount: item.subtotalAmount.toString(),
+    })),
+    finalizedAt: record.finalizedAt?.toISOString() ?? null,
+    completedAt: record.completedAt?.toISOString() ?? null,
+    createdAt: record.createdAt.toISOString(),
+    updatedAt: record.updatedAt.toISOString(),
+  };
+}
 
-  const totalWeightKg = transaction.items.reduce(
-    (sum, item) => sum.add(item.weightKg),
-    new Prisma.Decimal(0),
-  );
+async function assertMember(organizationId: string, memberId: string): Promise<void> {
+  const member = await getPrisma().member.findFirst({
+    where: { id: memberId, organizationId, isActive: true },
+    select: { id: true },
+  });
+  if (!member) throw new InvalidTransactionReferenceError("Member is inactive or does not belong to this organization.");
+}
+
+async function buildItems(organizationId: string, input: readonly ItemInput[]) {
+  const pricedAt = new Date();
+  const uniqueItems = new Set(input.map(({ wasteTypeId, condition }) => `${wasteTypeId}:${condition}`));
+  const uniqueIds = new Set(input.map(({ wasteTypeId }) => wasteTypeId));
+  if (uniqueItems.size !== input.length) {
+    throw new InvalidTransactionReferenceError("Each waste type and condition combination may only appear once per transaction.");
+  }
+
+  const wasteTypes = await getPrisma().wasteType.findMany({
+    where: { organizationId, id: { in: [...uniqueIds] }, isActive: true },
+    include: {
+      priceVersions: {
+        where: {
+          effectiveFrom: { lte: pricedAt },
+          OR: [{ effectiveUntil: null }, { effectiveUntil: { gt: pricedAt } }],
+        },
+        orderBy: { effectiveFrom: "desc" },
+        take: 1,
+      },
+    },
+  });
+  if (wasteTypes.length !== uniqueIds.size) {
+    throw new InvalidTransactionReferenceError("One or more waste types are inactive or invalid.");
+  }
+
+  const byId = new Map(wasteTypes.map((wasteType) => [wasteType.id, wasteType]));
+  const items = input.map(({ wasteTypeId, condition, weightKg }) => {
+    const wasteType = byId.get(wasteTypeId);
+    if (!wasteType) throw new InvalidTransactionReferenceError("Waste type was not found.");
+    const activePrice = wasteType.priceVersions.find((price) => price.condition === condition);
+    if (!activePrice) throw new InvalidTransactionReferenceError(`Waste type '${wasteType.name}' has no active ${condition.toLowerCase()} price.`);
+    const weight = new Prisma.Decimal(weightKg);
+    const subtotal = weight.mul(activePrice.pricePerKg).toDecimalPlaces(2);
+    return {
+      wasteTypeId,
+      wasteTypeNameSnapshot: wasteType.name,
+      condition,
+      weightKg: weight,
+      pricePerKgSnapshot: activePrice.pricePerKg,
+      subtotalAmount: subtotal,
+    };
+  });
 
   return {
-    id: transaction.id,
-    memberId: transaction.memberId,
-    memberNumber: transaction.member.memberNumber,
-    memberFullName: transaction.member.fullName,
-    status: transaction.status,
-    settlementMethod: transaction.settlementMethod,
-    receiptToken: transaction.receiptToken,
-    clientUuid: transaction.clientUuid,
-    photoPath: transaction.photoPath,
-    totalWeightKg: totalWeightKg.toString(),
-    totalRupiah: transaction.totalRupiah?.toString() ?? null,
-    createdBy: transaction.createdBy,
-    completedBy: transaction.completedBy,
-    completedAt: transaction.completedAt?.toISOString() ?? null,
-    cancelledBy: transaction.cancelledBy,
-    cancelledAt: transaction.cancelledAt?.toISOString() ?? null,
-    cancellationReason: transaction.cancellationReason,
     items,
-    createdAt: transaction.createdAt.toISOString(),
-    updatedAt: transaction.updatedAt.toISOString(),
+    totalWeightKg: items.reduce((total, item) => total.add(item.weightKg), new Prisma.Decimal(0)),
+    totalAmount: items.reduce((total, item) => total.add(item.subtotalAmount), new Prisma.Decimal(0)),
   };
+}
+
+async function findRecord(organizationId: string, id: string): Promise<TransactionRecord> {
+  const record = await getPrisma().transaction.findFirst({
+    where: { id, organizationId },
+    include: transactionInclude,
+  });
+  if (!record) throw new TransactionNotFoundError();
+  return record;
 }
 
 export async function listTransactions(
@@ -74,197 +125,146 @@ export async function listTransactions(
   const prisma = getPrisma();
   const where: Prisma.TransactionWhereInput = {
     organizationId,
-    ...(input.status ? { status: input.status } : {}),
-    ...(input.memberId ? { memberId: input.memberId } : {}),
-    ...(input.dateFrom || input.dateTo
+    ...(input.search
       ? {
-          createdAt: {
-            ...(input.dateFrom ? { gte: input.dateFrom } : {}),
-            ...(input.dateTo ? { lte: input.dateTo } : {}),
-          },
+          OR: [
+            { member: { fullName: { contains: input.search, mode: "insensitive" } } },
+            { items: { some: { wasteTypeNameSnapshot: { contains: input.search, mode: "insensitive" } } } },
+          ],
         }
+      : {}),
+    ...(input.memberId ? { memberId: input.memberId } : {}),
+    ...(input.status ? { status: input.status } : {}),
+    ...(input.dateFrom || input.dateTo
+      ? { createdAt: { ...(input.dateFrom ? { gte: input.dateFrom } : {}), ...(input.dateTo ? { lte: input.dateTo } : {}) } }
       : {}),
   };
   const skip = (input.page - 1) * input.limit;
-  const [items, total] = await prisma.$transaction([
-    prisma.transaction.findMany({
-      where,
-      include: transactionRelations,
-      orderBy: { createdAt: "desc" },
-      skip,
-      take: input.limit,
-    }),
+  const [records, total] = await prisma.$transaction([
+    prisma.transaction.findMany({ where, include: transactionInclude, orderBy: { createdAt: "desc" }, skip, take: input.limit }),
     prisma.transaction.count({ where }),
   ]);
-
-  return {
-    items: items.map(toDto),
-    pagination: {
-      page: input.page,
-      limit: input.limit,
-      total,
-      totalPages: Math.ceil(total / input.limit),
-    },
-  };
+  return { items: records.map(toDto), pagination: { page: input.page, limit: input.limit, total, totalPages: Math.ceil(total / input.limit) } };
 }
 
-export async function getTransaction(
+export async function getTransaction(organizationId: string, id: string): Promise<TransactionDto> {
+  return toDto(await findRecord(organizationId, id));
+}
+
+export async function createTransaction(
   organizationId: string,
-  id: string,
+  actorId: string,
+  input: CreateTransactionInput,
 ): Promise<TransactionDto> {
-  const transaction = await getPrisma().transaction.findFirst({
-    where: { id, organizationId },
-    include: transactionRelations,
+  const existing = await getPrisma().transaction.findUnique({
+    where: { organizationId_clientRequestId: { organizationId, clientRequestId: input.clientRequestId } },
+    include: transactionInclude,
   });
-  if (!transaction) throw new TransactionNotFoundError();
-  return toDto(transaction);
-}
+  if (existing) return toDto(existing);
 
-// Locks the row so two concurrent finalize/settle/cancel calls on the same
-// transaction can't both pass their status check below.
-async function lockTransaction(
-  tx: Prisma.TransactionClient,
-  organizationId: string,
-  id: string,
-): Promise<TransactionWithRelations> {
-  const locked = await tx.$queryRaw<{ id: string }[]>`
-    SELECT id FROM transactions
-    WHERE id = ${id}::uuid AND organization_id = ${organizationId}::uuid
-    FOR UPDATE
-  `;
-  if (locked.length === 0) throw new TransactionNotFoundError();
-
-  return tx.transaction.findUniqueOrThrow({
-    where: { id },
-    include: transactionRelations,
-  });
-}
-
-// Locks items and snapshots the rupiah total. Items themselves still come
-// from wherever they were seeded - draft creation/editing is still pending a
-// team decision, see the NOTE in src/app/api/transactions/route.ts.
-export async function finalizeTransaction(
-  organizationId: string,
-  id: string,
-): Promise<TransactionDto> {
-  const transaction = await getPrisma().$transaction(async (tx) => {
-    const draft = await lockTransaction(tx, organizationId, id);
-    if (draft.status !== "DRAFT") throw new TransactionNotDraftError();
-    if (draft.items.length === 0) throw new TransactionEmptyError();
-
-    const totalRupiah = draft.items.reduce(
-      (sum, item) => sum.add(item.subtotalRupiah),
-      new Prisma.Decimal(0),
-    );
-
-    return tx.transaction.update({
-      where: { id },
-      data: { status: "FINALIZED", finalizedAt: new Date(), totalRupiah },
-      include: transactionRelations,
+  await assertMember(organizationId, input.memberId);
+  const totals = await buildItems(organizationId, input.items);
+  const record = await getPrisma().$transaction(async (tx) => {
+    const created = await tx.transaction.create({
+      data: {
+        organizationId,
+        memberId: input.memberId,
+        clientRequestId: input.clientRequestId,
+        source: input.source,
+        notes: input.notes,
+        createdBy: actorId,
+        totalWeightKg: totals.totalWeightKg,
+        totalAmount: totals.totalAmount,
+        items: { create: totals.items },
+      },
+      include: transactionInclude,
     });
+    await tx.auditLog.create({ data: { organizationId, actorId, action: "TRANSACTION_CREATED", entityType: "transaction", entityId: created.id } });
+    return created;
   });
-
-  return toDto(transaction);
+  return toDto(record);
 }
 
-// DIRECT_CASH never touches the savings ledger; SAVINGS produces exactly one
-// DEPOSIT ledger credit - see root README "Alur Utama" and "Aturan Bisnis
-// Kritis" ("DIRECT_CASH tidak menambah saldo" / "SAVINGS menghasilkan tepat
-// satu kredit ledger").
-export async function settleTransaction(
+export async function updateTransaction(
   organizationId: string,
-  completedBy: string,
+  actorId: string,
   id: string,
-  input: SettleTransactionInput,
+  input: UpdateTransactionInput,
 ): Promise<TransactionDto> {
-  const transaction = await getPrisma().$transaction(async (tx) => {
-    const finalized = await lockTransaction(tx, organizationId, id);
-    if (finalized.status !== "FINALIZED") {
-      throw new TransactionNotFinalizedError();
-    }
+  const current = await findRecord(organizationId, id);
+  if (current.status !== "DRAFT") throw new InvalidTransactionStateError("Only a DRAFT transaction can be edited.");
+  if (input.memberId) await assertMember(organizationId, input.memberId);
+  const totals = input.items ? await buildItems(organizationId, input.items) : null;
 
+  const record = await getPrisma().$transaction(async (tx) => {
+    if (totals) await tx.transactionItem.deleteMany({ where: { transactionId: id } });
     const updated = await tx.transaction.update({
       where: { id },
       data: {
-        status: "COMPLETED",
-        settlementMethod: input.settlementMethod,
-        completedBy,
-        completedAt: new Date(),
+        ...(input.memberId ? { memberId: input.memberId } : {}),
+        ...(input.notes !== undefined ? { notes: input.notes } : {}),
+        ...(totals ? { totalWeightKg: totals.totalWeightKg, totalAmount: totals.totalAmount, items: { create: totals.items } } : {}),
       },
-      include: transactionRelations,
+      include: transactionInclude,
     });
-
-    if (input.settlementMethod === "SAVINGS") {
-      await creditLedger(tx, {
-        organizationId,
-        memberId: finalized.memberId,
-        entryType: "DEPOSIT",
-        amountRupiah: finalized.totalRupiah ?? new Prisma.Decimal(0),
-        sourceId: finalized.id,
-      });
-    }
-
-    await tx.member.update({
-      where: { id: finalized.memberId },
-      data: { lastActivityAt: new Date() },
-    });
-
-    await tx.auditLog.create({
-      data: {
-        organizationId,
-        actorId: completedBy,
-        action: "TRANSACTION_SETTLED",
-        entityType: "Transaction",
-        entityId: finalized.id,
-        metadata: {
-          settlementMethod: input.settlementMethod,
-          totalRupiah: (finalized.totalRupiah ?? new Prisma.Decimal(0)).toString(),
-        },
-      },
-    });
-
+    await tx.auditLog.create({ data: { organizationId, actorId, action: "TRANSACTION_UPDATED", entityType: "transaction", entityId: id } });
     return updated;
   });
+  return toDto(record);
+}
 
-  return toDto(transaction);
+export async function finalizeTransaction(organizationId: string, actorId: string, id: string): Promise<TransactionDto> {
+  const current = await findRecord(organizationId, id);
+  if (current.status !== "DRAFT") throw new InvalidTransactionStateError("Only a DRAFT transaction can be finalized.");
+  if (current.items.length === 0) throw new InvalidTransactionStateError("A transaction must contain at least one item.");
+  const now = new Date();
+  const record = await getPrisma().$transaction(async (tx) => {
+    const updated = await tx.transaction.update({ where: { id }, data: { status: "FINALIZED", finalizedBy: actorId, finalizedAt: now }, include: transactionInclude });
+    await tx.auditLog.create({ data: { organizationId, actorId, action: "TRANSACTION_FINALIZED", entityType: "transaction", entityId: id } });
+    return updated;
+  });
+  return toDto(record);
+}
+
+export async function completeTransaction(
+  organizationId: string,
+  actorId: string,
+  id: string,
+  input: CompleteTransactionInput,
+): Promise<TransactionDto> {
+  const current = await findRecord(organizationId, id);
+  if (current.status === "COMPLETED") return toDto(current);
+  if (current.status !== "FINALIZED") throw new InvalidTransactionStateError("Only a FINALIZED transaction can be completed.");
+  const now = new Date();
+  const record = await getPrisma().$transaction(async (tx) => {
+    if (input.payoutMethod === "SAVINGS") {
+      await tx.financialLedger.create({
+        data: { organizationId, memberId: current.memberId, transactionId: id, entryType: "DEPOSIT", amount: current.totalAmount, referenceKey: `transaction:${id}`, createdBy: actorId },
+      });
+    }
+    await tx.member.update({ where: { id: current.memberId }, data: { lastActivityAt: now } });
+    const receiptNumber = `ECP-${now.toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }).replaceAll("-", "")}-${id.replaceAll("-", "").slice(0, 8).toUpperCase()}`;
+    const updated = await tx.transaction.update({ where: { id }, data: { status: "COMPLETED", payoutMethod: input.payoutMethod, completedBy: actorId, completedAt: now, receiptNumber, memberNameSnapshot: current.member.fullName }, include: transactionInclude });
+    await tx.auditLog.create({ data: { organizationId, actorId, action: "TRANSACTION_COMPLETED", entityType: "transaction", entityId: id, metadata: { payoutMethod: input.payoutMethod } } });
+    return updated;
+  });
+  return toDto(record);
 }
 
 export async function cancelTransaction(
   organizationId: string,
-  cancelledBy: string,
+  actorId: string,
   id: string,
   input: CancelTransactionInput,
 ): Promise<TransactionDto> {
-  const transaction = await getPrisma().$transaction(async (tx) => {
-    const current = await lockTransaction(tx, organizationId, id);
-    if (current.status !== "DRAFT" && current.status !== "FINALIZED") {
-      throw new TransactionNotCancellableError();
-    }
-
-    const updated = await tx.transaction.update({
-      where: { id },
-      data: {
-        status: "CANCELLED",
-        cancelledBy,
-        cancelledAt: new Date(),
-        cancellationReason: input.reason,
-      },
-      include: transactionRelations,
-    });
-
-    await tx.auditLog.create({
-      data: {
-        organizationId,
-        actorId: cancelledBy,
-        action: "TRANSACTION_CANCELLED",
-        entityType: "Transaction",
-        entityId: current.id,
-        reason: input.reason,
-      },
-    });
-
+  const current = await findRecord(organizationId, id);
+  if (!(["DRAFT", "FINALIZED"] as const).includes(current.status as "DRAFT" | "FINALIZED")) {
+    throw new InvalidTransactionStateError("Only a DRAFT or FINALIZED transaction can be cancelled.");
+  }
+  const record = await getPrisma().$transaction(async (tx) => {
+    const updated = await tx.transaction.update({ where: { id }, data: { status: "CANCELLED", cancelledAt: new Date(), cancellationReason: input.reason }, include: transactionInclude });
+    await tx.auditLog.create({ data: { organizationId, actorId, action: "TRANSACTION_CANCELLED", entityType: "transaction", entityId: id, reason: input.reason } });
     return updated;
   });
-
-  return toDto(transaction);
+  return toDto(record);
 }

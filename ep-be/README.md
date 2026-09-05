@@ -1,36 +1,58 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# EcoPoin Backend
 
-## Getting Started
+Next.js App Router API untuk autentikasi, master warga, jenis sampah, dan transaksi setoran EcoPoin. Autentikasi menggunakan Supabase Auth melalui cookie HTTP-only; data aplikasi dikelola dengan Prisma dan PostgreSQL Supabase.
 
-First, run the development server:
+## Menjalankan aplikasi
 
-```bash
+```powershell
+npm install
+npx prisma generate
+npx prisma migrate deploy
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Environment
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Salin `.env.example` menjadi `.env`. Jangan commit `.env` atau service-role key.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Kontrak transaksi setoran
 
-## Learn More
+Semua request memakai cookie hasil `POST /api/auth/login` (`withCredentials: true` pada Axios).
 
-To learn more about Next.js, take a look at the following resources:
+| Method | Path | Fungsi |
+| --- | --- | --- |
+| `POST` | `/api/transactions` | Membuat draft idempotent |
+| `GET` | `/api/transactions` | Daftar/filter transaksi |
+| `GET` | `/api/transactions/:id` | Detail transaksi |
+| `PATCH` | `/api/transactions/:id` | Mengubah draft |
+| `POST` | `/api/transactions/:id/finalize` | Mengunci draft |
+| `POST` | `/api/transactions/:id/complete` | Menyelesaikan tunai/tabungan |
+| `POST` | `/api/transactions/:id/cancel` | Membatalkan draft/finalized |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```json
+{
+  "memberId": "UUID_WARGA",
+  "clientRequestId": "UUID_UNIK_DARI_CLIENT",
+  "source": "DIRECT_ENTRY",
+  "notes": "Setoran mingguan",
+  "items": [
+    {
+      "wasteTypeId": "UUID_JENIS_SAMPAH",
+      "condition": "SORTED",
+      "weightKg": 4.25
+    }
+  ]
+}
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Kategori material tersedia sebagai `PLASTIC`, `PAPER`, `METAL`, `GLASS`, dan `OTHER`. Setiap jenis memiliki harga `SORTED` dan `UNSORTED` yang berversi. Harga tidak diterima dari frontend; transaksi memilih versi aktif sesuai kondisi lalu menyimpan snapshot rupiah/kg. Penyelesaian memakai `{ "payoutMethod": "DIRECT_CASH" }` atau `{ "payoutMethod": "SAVINGS" }`; hanya `SAVINGS` yang menghasilkan kredit ledger.
 
-## Deploy on Vercel
+Urutan status valid: `DRAFT -> FINALIZED -> COMPLETED`. Draft/finalized dapat dibatalkan menjadi `CANCELLED`. Filter daftar: `memberId`, `status`, `dateFrom`, `dateTo`, `page`, dan `limit`.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Quality check
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```powershell
+npm run lint
+npm run type-check
+npm run build
+```

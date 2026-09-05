@@ -37,7 +37,7 @@ export async function PATCH(
     const id = await parseId(context);
     const input = parseSchema(updateWasteTypeSchema, await request.json());
     return successResponse({
-      wasteType: await updateWasteType(user.organizationId, id, input),
+      wasteType: await updateWasteType(user.organizationId, user.id, id, input),
     });
   } catch (error: unknown) {
     return errorResponse(error);
