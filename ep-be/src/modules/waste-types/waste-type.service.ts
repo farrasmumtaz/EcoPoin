@@ -1,22 +1,16 @@
 import type { Prisma } from "@/generated/prisma/client";
 import { getPrisma } from "@/infrastructure/database/prisma";
 import {
-  InvalidPriceRangeError,
-  NoActivePriceError,
   WasteTypeNameConflictError,
   WasteTypeNotFoundError,
 } from "@/modules/waste-types/waste-type.errors";
 import type {
-  CreatePriceVersionInput,
   CreateWasteTypeInput,
-  ListPriceVersionsInput,
   ListWasteTypesInput,
   UpdateWasteTypeInput,
 } from "@/modules/waste-types/waste-type.schema";
 import type {
-  PaginatedWastePriceVersions,
   PaginatedWasteTypes,
-  WastePriceVersionDto,
   WasteTypeDto,
 } from "@/modules/waste-types/waste-type.types";
 
@@ -53,18 +47,6 @@ function toDto(wasteType: WasteTypeWithPrice): WasteTypeDto {
     isActive: wasteType.isActive,
     createdAt: wasteType.createdAt.toISOString(),
     updatedAt: wasteType.updatedAt.toISOString(),
-  };
-}
-
-function toPriceVersionDto(version: WastePriceVersion): WastePriceVersionDto {
-  return {
-    id: version.id,
-    wasteTypeId: version.wasteTypeId,
-    priceScheme: version.priceScheme,
-    pricePerKg: version.pricePerKg.toString(),
-    effectiveFrom: version.effectiveFrom.toISOString(),
-    effectiveUntil: version.effectiveUntil?.toISOString() ?? null,
-    createdAt: version.createdAt.toISOString(),
   };
 }
 
@@ -215,104 +197,4 @@ export async function deactivateWasteType(
     include: getActivePriceInclude(),
   });
   return toDto(wasteType);
-}
-
-export async function listPriceVersions(
-  organizationId: string,
-  wasteTypeId: string,
-  input: ListPriceVersionsInput,
-): Promise<PaginatedWastePriceVersions> {
-  await getWasteType(organizationId, wasteTypeId);
-  const prisma = getPrisma();
-  const where: Prisma.WastePriceVersionWhereInput = {
-    wasteTypeId,
-    ...(input.priceScheme ? { priceScheme: input.priceScheme } : {}),
-  };
-  const skip = (input.page - 1) * input.limit;
-  const [items, total] = await prisma.$transaction([
-    prisma.wastePriceVersion.findMany({
-      where,
-      orderBy: { effectiveFrom: "desc" },
-      skip,
-      take: input.limit,
-    }),
-    prisma.wastePriceVersion.count({ where }),
-  ]);
-
-  return {
-    items: items.map(toPriceVersionDto),
-    pagination: {
-      page: input.page,
-      limit: input.limit,
-      total,
-      totalPages: Math.ceil(total / input.limit),
-    },
-  };
-}
-
-// Used both by the "active price" endpoint and by whatever eventually builds
-// transaction items (still pending a team decision - see
-// src/app/api/transactions/route.ts).
-export async function getActivePrice(
-  organizationId: string,
-  wasteTypeId: string,
-  priceScheme: string,
-  at: Date = new Date(),
-): Promise<WastePriceVersionDto> {
-  await getWasteType(organizationId, wasteTypeId);
-  const version = await getPrisma().wastePriceVersion.findFirst({
-    where: {
-      wasteTypeId,
-      priceScheme,
-      effectiveFrom: { lte: at },
-      OR: [{ effectiveUntil: null }, { effectiveUntil: { gt: at } }],
-    },
-    orderBy: { effectiveFrom: "desc" },
-  });
-  if (!version) throw new NoActivePriceError();
-  return toPriceVersionDto(version);
-}
-
-// Creating a new version closes whatever version was still open for that
-// same (wasteTypeId, priceScheme) - prices are never edited in place so past
-// transaction snapshots stay meaningful (see root README "Aturan Bisnis
-// Kritis": "Perubahan daftar harga tidak mengubah transaksi lama").
-export async function createPriceVersion(
-  organizationId: string,
-  wasteTypeId: string,
-  input: CreatePriceVersionInput,
-): Promise<WastePriceVersionDto> {
-  await getWasteType(organizationId, wasteTypeId);
-  const effectiveFrom = input.effectiveFrom ?? new Date();
-  const prisma = getPrisma();
-
-  const created = await prisma.$transaction(async (tx) => {
-    const openVersion = await tx.wastePriceVersion.findFirst({
-      where: {
-        wasteTypeId,
-        priceScheme: input.priceScheme,
-        effectiveUntil: null,
-      },
-    });
-    if (openVersion && openVersion.effectiveFrom >= effectiveFrom) {
-      throw new InvalidPriceRangeError();
-    }
-    if (openVersion) {
-      await tx.wastePriceVersion.update({
-        where: { id: openVersion.id },
-        data: { effectiveUntil: effectiveFrom },
-      });
-    }
-
-    return tx.wastePriceVersion.create({
-      data: {
-        wasteTypeId,
-        priceScheme: input.priceScheme,
-        pricePerKg: input.pricePerKg,
-        effectiveFrom,
-      },
-    });
-  });
-
-  return toPriceVersionDto(created);
 }

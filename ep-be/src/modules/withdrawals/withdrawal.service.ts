@@ -11,7 +11,7 @@ async function balance(client: Prisma.TransactionClient | ReturnType<typeof getP
   const groups = await client.financialLedger.groupBy({ by: ["entryType"], where: { organizationId, memberId }, orderBy: { entryType: "asc" }, _sum: { amount: true } });
   const credit = groups.filter(({ entryType }) => entryType === "DEPOSIT" || entryType === "ADJUSTMENT").reduce((sum, row) => sum.add(row._sum?.amount ?? 0), new Prisma.Decimal(0));
   const debit = groups.filter(({ entryType }) => entryType === "WITHDRAWAL" || entryType === "REVERSAL").reduce((sum, row) => sum.add(row._sum?.amount ?? 0), new Prisma.Decimal(0));
-  return credhttps://github.com/farrasmumtaz/EcoPoin/pull/20/conflict?name=ep-be%252Fsrc%252Fmodules%252Fwithdrawals%252Fwithdrawal.service.ts&base_oid=cb8d124e5ced92823d516b8f276c432bf187bc57&head_oid=5cbc51f937c5d5af047ad6f0f9309a67ee4a7b45it.sub(debit);
+  return credit.sub(debit);
 }
 export async function listWithdrawals(organizationId: string, input: ListWithdrawalsInput) {
   const prisma = getPrisma(); const where: Prisma.WithdrawalWhereInput = { organizationId, ...(input.status ? { status: input.status } : {}), ...(input.search ? { member: { OR: [{ fullName: { contains: input.search, mode: "insensitive" } }, { memberNumber: { contains: input.search, mode: "insensitive" } }] } } : {}) }; const skip = (input.page - 1) * input.limit;
