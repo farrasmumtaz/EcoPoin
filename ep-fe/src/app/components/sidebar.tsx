@@ -7,6 +7,7 @@ import {
   CircleDollarSign,
   FileText,
   HandCoins,
+  WalletCards,
   LayoutGrid,
   LogOut,
   Recycle,
@@ -37,6 +38,7 @@ const menuSections: MenuSection[] = [
       { label: "Data Warga", icon: Users, href: "/data-warga" },
       { label: "Setoran", icon: HandCoins, href: "/setoran" },
       { label: "Tabungan", icon: CircleDollarSign, href: "/tabungan" },
+      { label: "Penarikan", icon: WalletCards, href: "/penarikan" },
     ],
   },
   {

@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, Plus, Pencil, Trash2 } from "lucide-react";
+import { Eye, Search, Plus, Pencil, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
@@ -163,6 +163,14 @@ export default function DataWarga() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          aria-label={`Lihat detail ${member.fullName}`}
+                          onClick={() => router.push(`/data-warga/detail-warga?id=${encodeURIComponent(member.id)}`)}
+                          className="flex h-8 w-9 items-center justify-center rounded-md border border-blue-500 text-blue-600 transition hover:bg-blue-500 hover:text-white cursor-pointer"
+                        >
+                          <Eye size={15} />
+                        </button>
                         <button
                           aria-label={`Edit ${member.fullName}`}
                           onClick={() => goToEditWarga(member)}

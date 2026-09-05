@@ -102,6 +102,15 @@ enum FinancialLedgerEntryType {
   @@map("financial_ledger_entry_type")
 }
 
+enum WithdrawalStatus {
+  REQUESTED
+  APPROVED
+  PAID
+  REJECTED
+
+  @@map("withdrawal_status")
+}
+
 model Organization {
   id                    String   @id @default(uuid()) @db.Uuid
   name                  String   @db.VarChar(160)
@@ -122,6 +131,7 @@ model Organization {
   transactions        Transaction[]
   financialLedger     FinancialLedger[]
   wastePriceVersions  WastePriceVersion[]
+  withdrawals         Withdrawal[]
 
   @@map("organizations")
 }
@@ -147,6 +157,9 @@ model Profile {
   completedTransactions  Transaction[]       @relation("TransactionCompletedBy")
   financialLedgerEntries FinancialLedger[]   @relation("FinancialLedgerCreatedBy")
   createdWastePrices     WastePriceVersion[] @relation("WastePriceCreatedBy")
+  requestedWithdrawals   Withdrawal[]        @relation("WithdrawalRequestedBy")
+  approvedWithdrawals    Withdrawal[]        @relation("WithdrawalApprovedBy")
+  paidWithdrawals        Withdrawal[]        @relation("WithdrawalPaidBy")
 
   @@index([organizationId, isActive])
   @@map("profiles")
@@ -176,6 +189,7 @@ model Member {
   unitRelationships       MemberRelationship[] @relation("RelationshipUnit")
   transactions            Transaction[]
   financialLedger         FinancialLedger[]
+  withdrawals             Withdrawal[]
 
   @@unique([organizationId, memberNumber])
   @@index([organizationId, type, isActive, fullName])
@@ -425,6 +439,7 @@ model FinancialLedger {
   organizationId String                   @map("organization_id") @db.Uuid
   memberId       String                   @map("member_id") @db.Uuid
   transactionId  String?                  @map("transaction_id") @db.Uuid
+  withdrawalId   String?                  @unique @map("withdrawal_id") @db.Uuid
   entryType      FinancialLedgerEntryType @map("entry_type")
   amount         Decimal                  @db.Decimal(18, 2)
   referenceKey   String                   @map("reference_key") @db.VarChar(160)
@@ -435,10 +450,40 @@ model FinancialLedger {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   member       Member       @relation(fields: [memberId], references: [id], onDelete: Restrict)
   transaction  Transaction? @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+  withdrawal   Withdrawal?  @relation(fields: [withdrawalId], references: [id], onDelete: Restrict)
   creator      Profile      @relation("FinancialLedgerCreatedBy", fields: [createdBy], references: [id], onDelete: Restrict)
 
   @@unique([organizationId, referenceKey])
   @@index([organizationId, memberId, createdAt])
   @@index([transactionId])
   @@map("financial_ledger")
+}
+
+model Withdrawal {
+  id              String           @id @default(uuid()) @db.Uuid
+  organizationId  String           @map("organization_id") @db.Uuid
+  memberId        String           @map("member_id") @db.Uuid
+  status          WithdrawalStatus @default(REQUESTED)
+  amount          Decimal          @db.Decimal(18, 2)
+  notes           String?          @db.VarChar(500)
+  rejectionReason String?          @map("rejection_reason") @db.VarChar(500)
+  requestedBy     String           @map("requested_by") @db.Uuid
+  approvedBy      String?          @map("approved_by") @db.Uuid
+  paidBy          String?          @map("paid_by") @db.Uuid
+  approvedAt      DateTime?        @map("approved_at") @db.Timestamptz(3)
+  paidAt          DateTime?        @map("paid_at") @db.Timestamptz(3)
+  rejectedAt      DateTime?        @map("rejected_at") @db.Timestamptz(3)
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  member       Member            @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  requester    Profile           @relation("WithdrawalRequestedBy", fields: [requestedBy], references: [id], onDelete: Restrict)
+  approver     Profile?          @relation("WithdrawalApprovedBy", fields: [approvedBy], references: [id], onDelete: Restrict)
+  payer        Profile?          @relation("WithdrawalPaidBy", fields: [paidBy], references: [id], onDelete: Restrict)
+  ledgerEntry  FinancialLedger?
+
+  @@index([organizationId, status, createdAt])
+  @@index([organizationId, memberId, createdAt])
+  @@map("withdrawals")
 }

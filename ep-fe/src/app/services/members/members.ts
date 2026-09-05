@@ -167,3 +167,21 @@ export async function deactivateMember(id: string): Promise<Member> {
     throw new Error(extractErrorMessage(error, "Anggota tidak dapat dinonaktifkan."));
   }
 }
+
+export interface MemberSummary {
+  readonly member: Member;
+  readonly statistics: { readonly balance: string; readonly totalDepositAmount: string; readonly totalWeightKg: string; readonly completedTransactions: number };
+  readonly transactions: readonly { readonly id: string; readonly status: "DRAFT" | "FINALIZED" | "COMPLETED" | "CANCELLED" | "VOIDED"; readonly payoutMethod: "DIRECT_CASH" | "SAVINGS" | null; readonly totalWeightKg: string; readonly totalAmount: string; readonly createdAt: string }[];
+  readonly ledgerEntries: readonly { readonly id: string; readonly entryType: "DEPOSIT" | "WITHDRAWAL" | "REVERSAL" | "ADJUSTMENT"; readonly amount: string; readonly referenceKey: string; readonly createdAt: string }[];
+}
+
+type MemberSummaryResponse = ApiSuccessResponse<MemberSummary>;
+
+export async function getMemberSummary(id: string): Promise<MemberSummary> {
+  try {
+    const response = await api.get<MemberSummaryResponse>(`/members/${id}/summary`);
+    return response.data.data;
+  } catch (error: unknown) {
+    throw new Error(extractErrorMessage(error, "Ringkasan anggota tidak dapat dimuat."));
+  }
+}

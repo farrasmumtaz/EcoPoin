@@ -1,0 +1,12 @@
+import axios from "axios"; import { api } from "@/app/api/axiosInstance";
+export type WithdrawalStatus = "REQUESTED" | "APPROVED" | "PAID" | "REJECTED";
+export interface Withdrawal { readonly id: string; readonly memberId: string; readonly memberNumber: string; readonly memberName: string; readonly status: WithdrawalStatus; readonly amount: string; readonly notes: string | null; readonly rejectionReason: string | null; readonly approvedAt: string | null; readonly paidAt: string | null; readonly createdAt: string; }
+interface ListResponse { readonly success: true; readonly data: { readonly items: readonly Withdrawal[]; readonly pagination: { readonly page: number; readonly limit: number; readonly total: number; readonly totalPages: number } }; }
+interface ItemResponse { readonly success: true; readonly data: { readonly withdrawal: Withdrawal }; }
+interface ErrorResponse { readonly success: false; readonly error: { readonly message: string }; }
+function message(error: unknown): string { return axios.isAxiosError<ErrorResponse>(error) ? error.response?.data.error.message ?? "Proses penarikan gagal." : "Proses penarikan gagal."; }
+export async function getWithdrawals(params: { readonly search?: string; readonly status?: WithdrawalStatus; readonly page?: number; readonly limit?: number } = {}) { try { return (await api.get<ListResponse>("/withdrawals", { params })).data.data; } catch (error: unknown) { throw new Error(message(error)); } }
+export async function createWithdrawal(payload: { readonly memberId: string; readonly amount: number; readonly notes?: string }): Promise<Withdrawal> { try { return (await api.post<ItemResponse>("/withdrawals", payload)).data.data.withdrawal; } catch (error: unknown) { throw new Error(message(error)); } }
+export async function approveWithdrawal(id: string): Promise<Withdrawal> { try { return (await api.post<ItemResponse>(`/withdrawals/${id}/approve`)).data.data.withdrawal; } catch (error: unknown) { throw new Error(message(error)); } }
+export async function rejectWithdrawal(id: string, reason: string): Promise<Withdrawal> { try { return (await api.post<ItemResponse>(`/withdrawals/${id}/reject`, { reason })).data.data.withdrawal; } catch (error: unknown) { throw new Error(message(error)); } }
+export async function payWithdrawal(id: string): Promise<Withdrawal> { try { return (await api.post<ItemResponse>(`/withdrawals/${id}/pay`)).data.data.withdrawal; } catch (error: unknown) { throw new Error(message(error)); } }
