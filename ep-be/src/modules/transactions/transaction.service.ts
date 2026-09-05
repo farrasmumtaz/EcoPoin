@@ -31,6 +31,7 @@ function toDto(record: TransactionRecord): TransactionDto {
     source: record.source,
     payoutMethod: record.payoutMethod,
     receiptToken: record.receiptToken,
+    receiptNumber: record.receiptNumber,
     notes: record.notes,
     totalWeightKg: record.totalWeightKg.toString(),
     totalAmount: record.totalAmount.toString(),
@@ -242,7 +243,8 @@ export async function completeTransaction(
       });
     }
     await tx.member.update({ where: { id: current.memberId }, data: { lastActivityAt: now } });
-    const updated = await tx.transaction.update({ where: { id }, data: { status: "COMPLETED", payoutMethod: input.payoutMethod, completedBy: actorId, completedAt: now }, include: transactionInclude });
+    const receiptNumber = `ECP-${now.toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }).replaceAll("-", "")}-${id.replaceAll("-", "").slice(0, 8).toUpperCase()}`;
+    const updated = await tx.transaction.update({ where: { id }, data: { status: "COMPLETED", payoutMethod: input.payoutMethod, completedBy: actorId, completedAt: now, receiptNumber, memberNameSnapshot: current.member.fullName }, include: transactionInclude });
     await tx.auditLog.create({ data: { organizationId, actorId, action: "TRANSACTION_COMPLETED", entityType: "transaction", entityId: id, metadata: { payoutMethod: input.payoutMethod } } });
     return updated;
   });

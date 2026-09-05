@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronDown, ChevronUp, Pencil, Plus, Search, X } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, FileText, Pencil, Plus, Search, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
@@ -114,6 +114,7 @@ function Rows({ transaction, expanded, processing, onToggle, onEdit, onFinalize,
       {transaction.status === "DRAFT" && <button type="button" disabled={processing} onClick={onEdit} title="Edit draft" className="flex h-9 w-9 items-center justify-center rounded-md border border-amber-500 text-amber-600 hover:bg-amber-500 hover:text-white disabled:opacity-50 cursor-pointer"><Pencil size={16} /></button>}
       {transaction.status === "DRAFT" && <button type="button" disabled={processing} onClick={onFinalize} title="Finalisasi" className="flex h-9 w-9 items-center justify-center rounded-md border border-primary text-primary hover:bg-primary hover:text-white disabled:opacity-50 cursor-pointer"><Check size={16} /></button>}
       {transaction.status === "FINALIZED" && <button type="button" disabled={processing} onClick={onComplete} className="rounded-md border border-primary px-3 py-2 text-xs font-bold text-primary hover:bg-primary hover:text-white disabled:opacity-50 cursor-pointer">Cairkan</button>}
+      {transaction.status === "COMPLETED" && <button type="button" onClick={() => window.open(`/receipt/${transaction.receiptToken}`, "_blank", "noopener,noreferrer")} title="Buka nota" className="flex h-9 w-9 items-center justify-center rounded-md border border-blue-500 text-blue-600 hover:bg-blue-500 hover:text-white cursor-pointer"><FileText size={16} /></button>}
       {cancellable && <button type="button" disabled={processing} onClick={onCancel} title="Batalkan" className="flex h-9 w-9 items-center justify-center rounded-md border border-danger text-danger hover:bg-danger hover:text-white disabled:opacity-50 cursor-pointer"><X size={16} /></button>}
       <button type="button" onClick={onToggle} title="Detail" className="flex h-9 w-9 items-center justify-center rounded-md border border-gray-300 text-gray-600 hover:border-primary hover:text-primary cursor-pointer">{expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}</button>
     </div></td></tr>

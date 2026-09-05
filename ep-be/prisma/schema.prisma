@@ -389,6 +389,8 @@ model Transaction {
   payoutMethod       PayoutMethod?     @map("payout_method")
   clientRequestId    String            @map("client_request_id") @db.Uuid
   receiptToken       String            @unique @default(uuid()) @map("receipt_token") @db.Uuid
+  receiptNumber      String?           @unique @map("receipt_number") @db.VarChar(64)
+  memberNameSnapshot String?           @map("member_name_snapshot") @db.VarChar(160)
   notes              String?           @db.VarChar(500)
   totalWeightKg      Decimal           @default(0) @map("total_weight_kg") @db.Decimal(14, 3)
   totalAmount        Decimal           @default(0) @map("total_amount") @db.Decimal(18, 2)

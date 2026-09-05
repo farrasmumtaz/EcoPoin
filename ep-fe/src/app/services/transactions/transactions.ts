@@ -44,6 +44,8 @@ export interface Transaction {
   readonly status: TransactionStatus;
   readonly source: "DIRECT_ENTRY" | "IMPORT";
   readonly payoutMethod: "DIRECT_CASH" | "SAVINGS" | null;
+  readonly receiptToken: string;
+  readonly receiptNumber: string | null;
   readonly items: readonly TransactionItem[];
   readonly totalWeightKg: string;
   readonly totalAmount: string;
