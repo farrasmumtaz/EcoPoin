@@ -3,6 +3,7 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  color-scheme: light;
 }
 
 @theme {
@@ -16,15 +17,34 @@
   --color-placeholder: #d9d9d9;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-poppins);
+}
+
+@layer base {
+  table {
+    color: #1f2937;
+  }
+
+  tbody tr {
+    background-color: #ffffff;
+  }
+
+  tbody tr:hover {
+    background-color: #f9fafb;
+  }
+
+  input,
+  select,
+  textarea {
+    color: #111827;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: #9ca3af;
+    opacity: 1;
+  }
 }

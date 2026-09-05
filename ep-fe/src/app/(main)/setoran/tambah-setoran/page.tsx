@@ -1,12 +1,12 @@
 "use client";
 
 import { ChevronDown, Plus, Recycle, Users } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { FormEvent, Suspense, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 
 import { getMembers, type Member } from "@/app/services/members/members";
-import { createTransaction, finalizeTransaction } from "@/app/services/transactions/transactions";
+import { createTransaction, finalizeTransaction, getTransactionById, updateTransaction } from "@/app/services/transactions/transactions";
 import { getWasteTypes, type WasteType } from "@/app/services/waste-types/waste-types";
 
 interface FormFieldLabelProps {
@@ -48,7 +48,9 @@ const rupiahFormatter = new Intl.NumberFormat("id-ID", {
   maximumFractionDigits: 0,
 });
 
-export default function TambahSetoran() {
+function SetoranForm() {
+  const transactionId = useSearchParams().get("id") ?? "";
+  const isEditMode = Boolean(transactionId);
   const [individualId, setIndividualId] = useState("");
   const [asUnit, setAsUnit] = useState(false);
   const [unitId, setUnitId] = useState("");
@@ -65,11 +67,32 @@ export default function TambahSetoran() {
     Promise.all([
       getMembers({ limit: 100 }),
       getWasteTypes({ limit: 100 }),
+      transactionId ? getTransactionById(transactionId) : Promise.resolve(null),
     ])
-      .then(([memberResult, wasteTypeResult]) => {
+      .then(([memberResult, wasteTypeResult, transaction]) => {
         if (!active) return;
-        setMembers(memberResult.items.filter((member) => member.isActive));
+        const activeMembers = memberResult.items.filter((member) => member.isActive);
+        setMembers(activeMembers);
         setWasteTypes(wasteTypeResult.items.filter((wasteType) => wasteType.isActive));
+        if (transaction) {
+          if (transaction.status !== "DRAFT") {
+            toast.error("Hanya transaksi DRAFT yang dapat diedit.");
+            router.replace("/setoran");
+            return;
+          }
+          const selectedMember = activeMembers.find((member) => member.id === transaction.memberId);
+          const memberIsUnit = selectedMember?.type === "UNIT";
+          setAsUnit(memberIsUnit);
+          setIndividualId(memberIsUnit ? "" : transaction.memberId);
+          setUnitId(memberIsUnit ? transaction.memberId : "");
+          setItems(transaction.items.map((item, index) => ({
+            id: `item-${index}`,
+            wasteTypeId: item.wasteTypeId,
+            condition: item.condition,
+            weightKg: item.weightKg,
+          })));
+          nextItemId.current = transaction.items.length;
+        }
       })
       .catch((error: unknown) => {
         if (active) toast.error(error instanceof Error ? error.message : "Data form gagal dimuat.");
@@ -80,7 +103,7 @@ export default function TambahSetoran() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [router, transactionId]);
 
   const individuals = members.filter((member) => member.type === "INDIVIDUAL");
   const units = members.filter((member) => member.type === "UNIT");
@@ -101,12 +124,8 @@ export default function TambahSetoran() {
   };
 
   const validate = (): boolean => {
-    if (!individualId) {
-      toast.error("Pilih warga terlebih dahulu.");
-      return false;
-    }
-    if (asUnit && !unitId) {
-      toast.error("Pilih unit tujuan setoran.");
+    if ((!asUnit && !individualId) || (asUnit && !unitId)) {
+      toast.error("Pilih nasabah atau unit terlebih dahulu.");
       return false;
     }
     if (items.some((item) => !item.wasteTypeId || !item.weightKg || Number(item.weightKg) <= 0)) {
@@ -124,15 +143,16 @@ export default function TambahSetoran() {
     if (!validate() || isSaving) return;
     setIsSaving(true);
     try {
-      const transaction = await createTransaction({
+      const payload = {
         memberId: asUnit ? unitId : individualId,
-        clientRequestId: crypto.randomUUID(),
-        source: "DIRECT_ENTRY",
         items: items.map((item) => ({ wasteTypeId: item.wasteTypeId, condition: item.condition, weightKg: Number(item.weightKg) })),
-      });
+      };
+      const transaction = isEditMode
+        ? await updateTransaction(transactionId, payload)
+        : await createTransaction({ ...payload, clientRequestId: crypto.randomUUID(), source: "DIRECT_ENTRY" });
       if (finalize) await finalizeTransaction(transaction.id);
-      toast.success(finalize ? "Setoran berhasil disimpan." : "Draft setoran berhasil disimpan.");
-      resetForm();
+      toast.success(finalize ? "Setoran berhasil disimpan dan difinalisasi." : "Draft setoran berhasil disimpan.");
+      if (isEditMode) router.push("/setoran"); else resetForm();
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : "Setoran tidak dapat disimpan.");
     } finally {
@@ -147,6 +167,10 @@ export default function TambahSetoran() {
 
   return (
     <div className="min-h-full rounded-md bg-white p-6">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">{isEditMode ? "Edit Draft Setoran" : "Tambah Setoran"}</h1>
+        <p className="mt-1 text-sm text-gray-500">{isEditMode ? "Perubahan hanya dapat dilakukan selama transaksi masih berstatus draft." : "Catat sampah, kondisi, dan berat untuk nasabah atau unit."}</p>
+      </div>
       <form onSubmit={handleSubmit}>
         <div className="mb-6">
           <FormFieldLabel icon={<Users size={18} />}>Pilih Warga</FormFieldLabel>
@@ -267,10 +291,14 @@ export default function TambahSetoran() {
         <div className="flex flex-wrap items-center gap-4">
           <button type="button" onClick={() => router.back()} className="rounded-md bg-placeholder px-8 py-3 font-semibold text-white transition hover:opacity-75">Kembali</button>
           <button type="button" onClick={resetForm} disabled={isSaving} className="rounded-md bg-danger px-8 py-3 text-sm font-semibold text-white transition hover:opacity-75 disabled:opacity-50">Ulang</button>
-          <button type="button" onClick={() => void persist(false)} disabled={isSaving || isLoadingOptions} className="rounded-md bg-warning px-8 py-3 text-sm font-semibold text-white transition hover:opacity-75 disabled:opacity-50">Draft</button>
-          <button type="submit" disabled={isSaving || isLoadingOptions} className="rounded-md bg-primary px-8 py-3 text-sm font-semibold text-white transition hover:opacity-75 disabled:opacity-50">{isSaving ? "Menyimpan..." : "Simpan"}</button>
+          <button type="button" onClick={() => void persist(false)} disabled={isSaving || isLoadingOptions} className="rounded-md bg-warning px-8 py-3 text-sm font-semibold text-white transition hover:opacity-75 disabled:opacity-50">{isEditMode ? "Simpan Draft" : "Draft"}</button>
+          <button type="submit" disabled={isSaving || isLoadingOptions} className="rounded-md bg-primary px-8 py-3 text-sm font-semibold text-white transition hover:opacity-75 disabled:opacity-50">{isSaving ? "Menyimpan..." : isEditMode ? "Simpan & Finalisasi" : "Simpan"}</button>
         </div>
       </form>
     </div>
   );
+}
+
+export default function TambahSetoran() {
+  return <Suspense fallback={<div className="p-6 text-sm text-gray-500">Memuat form setoran...</div>}><SetoranForm /></Suspense>;
 }

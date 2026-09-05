@@ -1,163 +1,61 @@
 "use client";
 
-import { Users, Home, Phone } from "lucide-react";
+import { ArrowLeft, Home, Phone, Save, Users } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useMemo, FormEvent, Suspense } from "react";
+import { FormEvent, Suspense, useEffect, useState } from "react";
+import toast from "react-hot-toast";
 
-interface FormFieldLabelProps {
-  icon?: React.ReactNode;
-  children: React.ReactNode;
-}
-
-function FormFieldLabel({ icon, children }: FormFieldLabelProps) {
-  return (
-    <label className="mb-2 flex items-center gap-2 text-sm font-bold text-font">
-      {icon}
-      {children}
-    </label>
-  );
-}
+import { getMemberById, updateMember } from "@/app/services/members/members";
 
 function EditWargaForm() {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const id = useSearchParams().get("id") ?? "";
+  const [fullName, setFullName] = useState("");
+  const [rt, setRt] = useState("");
+  const [phone, setPhone] = useState("");
+  const [memberNumber, setMemberNumber] = useState("");
+  const [loading, setLoading] = useState(Boolean(id));
+  const [saving, setSaving] = useState(false);
 
-  // Snapshot of the data passed in via query params from the Data Warga
-  // table. "Ulang" restores the form to this snapshot instead of clearing it.
-  const originalData = useMemo(
-    () => ({
-      namaWarga: searchParams.get("nama") ?? "",
-      rtWarga: searchParams.get("rt") ?? "",
-      noTelp: searchParams.get("noTelp") ?? "",
-      nomorNasabah: searchParams.get("nomorNasabah") ?? "",
-      catatan: searchParams.get("catatan") ?? "",
-    }),
-    [searchParams],
-  );
+  useEffect(() => {
+    if (!id) { toast.error("ID warga tidak valid."); return; }
+    let active = true;
+    void getMemberById(id).then((member) => {
+      if (!active) return;
+      setFullName(member.fullName);
+      setRt(member.rt ?? "");
+      setPhone(member.phone ?? "");
+      setMemberNumber(member.memberNumber);
+    }).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Data warga gagal dimuat."))
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [id]);
 
-  const [namaWarga, setNamaWarga] = useState(originalData.namaWarga);
-  const [rtWarga, setRtWarga] = useState(originalData.rtWarga);
-  const [noTelp, setNoTelp] = useState(originalData.noTelp);
-  const [nomorNasabah] = useState(originalData.nomorNasabah); // not editable
-  const [catatan, setCatatan] = useState(originalData.catatan);
-
-  const resetForm = () => {
-    setNamaWarga(originalData.namaWarga);
-    setRtWarga(originalData.rtWarga);
-    setNoTelp(originalData.noTelp);
-    setCatatan(originalData.catatan);
+  const submit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
+    event.preventDefault();
+    if (!id || fullName.trim().length < 2) { toast.error("Nama warga minimal 2 karakter."); return; }
+    setSaving(true);
+    try {
+      await updateMember(id, { fullName: fullName.trim(), rt: rt.trim() || null, phone: phone.trim() || null });
+      toast.success("Data warga berhasil diperbarui.");
+      router.push("/data-warga");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Data warga gagal diperbarui.");
+    } finally { setSaving(false); }
   };
 
-  const handleSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    // TODO: call API to persist updated warga data
-    console.log({ namaWarga, rtWarga, noTelp, nomorNasabah, catatan });
-  };
+  const inputClass = "h-12 w-full rounded-lg border border-gray-300 bg-white px-4 text-sm text-gray-900 outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 disabled:bg-gray-100";
+  if (loading) return <div className="p-8 text-sm text-gray-500">Memuat data warga...</div>;
 
-  const inputClass =
-    "w-full rounded-md bg-placeholder/50 px-4 py-3 text-sm text-font placeholder:text-font/50 outline-none focus:ring-2 focus:ring-primary transition duration-300";
-
-  return (
-    <div className="min-h-full bg-white rounded-md p-6">
-      <form onSubmit={handleSubmit}>
-        {/* Nama Warga */}
-        <div className="mb-6">
-          <FormFieldLabel icon={<Users size={18} />}>Nama Warga</FormFieldLabel>
-          <input
-            type="text"
-            value={namaWarga}
-            onChange={(e) => setNamaWarga(e.target.value)}
-            placeholder="Isi nama warga"
-            className={inputClass}
-          />
-        </div>
-
-        {/* RT Warga / Nomor Telepon Warga / Nomor Nasabah */}
-        <div className="mb-6 grid grid-cols-1 gap-6 md:grid-cols-3">
-          <div>
-            <FormFieldLabel icon={<Home size={16} />}>RT Warga</FormFieldLabel>
-            <input
-              type="text"
-              value={rtWarga}
-              onChange={(e) => setRtWarga(e.target.value)}
-              placeholder="Isi RT warga"
-              className={inputClass}
-            />
-          </div>
-
-          <div>
-            <FormFieldLabel icon={<Phone size={16} />}>
-              Nomor Telepon Warga
-            </FormFieldLabel>
-            <input
-              type="tel"
-              value={noTelp}
-              onChange={(e) => setNoTelp(e.target.value)}
-              placeholder="Isi nomor telepon warga"
-              className={inputClass}
-            />
-          </div>
-
-          <div>
-            <FormFieldLabel>Nomor Nasabah</FormFieldLabel>
-            <input
-              type="text"
-              value={nomorNasabah}
-              readOnly
-              disabled
-              className={`${inputClass} cursor-not-allowed opacity-80`}
-            />
-          </div>
-        </div>
-
-        {/* Catatan Opsional */}
-        <div className="mb-6">
-          <label className="mb-2 block text-sm font-bold text-font">
-            Catatan Opsional
-          </label>
-          <textarea
-            value={catatan}
-            onChange={(e) => setCatatan(e.target.value)}
-            rows={8}
-            className="w-full resize-none rounded-md bg-placeholder/50 px-4 py-3 text-sm text-font outline-none focus:ring-2 focus:ring-primary transition duration-300"
-          />
-        </div>
-
-        {/* Actions */}
-        <div className="flex items-center gap-4">
-          <button
-            type="button"
-            onClick={() => router.back()}
-            className="rounded-md bg-placeholder px-8 py-3 font-semibold text-white transition hover:opacity-75 cursor-pointer duration-300"
-          >
-            Kembali
-          </button>
-          <button
-            type="button"
-            onClick={resetForm}
-            className="rounded-md bg-danger px-8 py-3 text-sm font-semibold text-white transition hover:opacity-75 cursor-pointer duration-300"
-          >
-            Ulang
-          </button>
-          <button
-            type="submit"
-            className="rounded-md bg-primary px-8 py-3 text-sm font-semibold text-white transition hover:opacity-75 cursor-pointer duration-300"
-          >
-            Simpan
-          </button>
-        </div>
-      </form>
-    </div>
-  );
+  return <div className="min-h-full bg-gray-50 p-6 md:p-8"><div className="mx-auto max-w-4xl">
+    <button type="button" onClick={() => router.back()} className="mb-4 flex items-center gap-2 text-sm font-semibold text-gray-600 hover:text-primary cursor-pointer"><ArrowLeft size={18} /> Kembali</button>
+    <h1 className="text-2xl font-bold text-gray-900">Edit Data Warga</h1><p className="mt-1 text-sm text-gray-500">Perbarui identitas dan kontak warga tanpa mengubah nomor nasabah.</p>
+    <form onSubmit={submit} className="mt-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm md:p-8">
+      <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-800"><Users size={17} /> Nama Warga</label><input value={fullName} onChange={(event) => setFullName(event.target.value)} className={inputClass} />
+      <div className="mt-5 grid gap-5 md:grid-cols-3"><div><label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-800"><Home size={17} /> RT</label><input value={rt} onChange={(event) => setRt(event.target.value)} className={inputClass} placeholder="Contoh: RT 02" /></div><div><label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-800"><Phone size={17} /> Nomor telepon</label><input type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} className={inputClass} /></div><div><label className="mb-2 block text-sm font-semibold text-gray-800">Nomor nasabah</label><input value={memberNumber} disabled className={inputClass} /></div></div>
+      <div className="mt-8 flex justify-end gap-3 border-t border-gray-200 pt-6"><button type="button" onClick={() => router.back()} className="rounded-lg border border-gray-300 px-6 py-3 font-semibold text-gray-700">Batal</button><button type="submit" disabled={saving} className="flex items-center gap-2 rounded-lg bg-primary px-6 py-3 font-semibold text-white disabled:opacity-50"><Save size={17} />{saving ? "Menyimpan..." : "Simpan Perubahan"}</button></div>
+    </form>
+  </div></div>;
 }
 
-// useSearchParams() opts the tree into client-side rendering unless wrapped
-// in Suspense, so the actual page default-exports a Suspense boundary
-// around the form rather than using useSearchParams directly here.
-export default function EditWarga() {
-  return (
-    <Suspense fallback={null}>
-      <EditWargaForm />
-    </Suspense>
-  );
-}
+export default function EditWarga() { return <Suspense fallback={<div className="p-8 text-sm text-gray-500">Memuat halaman...</div>}><EditWargaForm /></Suspense>; }

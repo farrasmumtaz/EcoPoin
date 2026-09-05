@@ -18,6 +18,7 @@ export interface TransactionDto {
   readonly source: TransactionSource;
   readonly payoutMethod: PayoutMethod | null;
   readonly receiptToken: string;
+  readonly receiptNumber: string | null;
   readonly notes: string | null;
   readonly totalWeightKg: string;
   readonly totalAmount: string;

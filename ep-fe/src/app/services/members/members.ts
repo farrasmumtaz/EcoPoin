@@ -67,14 +67,14 @@ function extractErrorMessage(error: unknown, fallback: string): string {
 // directly under `data`, not wrapped in an extra `{ member: ... }` key like
 // the list response wraps its array in `items`. Confirm against a real
 // create response and adjust if it's wrapped differently.
-type AddMemberResponse = ApiSuccessResponse<Member>;
+type MemberResponse = ApiSuccessResponse<{ readonly member: Member }>;
 
 export async function addMembers(payload: AddMemberPayload): Promise<Member> {
   try {
     // NOTE: adjust the endpoint path ("/members") to whatever your backend
     // actually exposes for creating a member/unit.
-    const response = await api.post<AddMemberResponse>("/members", payload);
-    return response.data.data;
+    const response = await api.post<MemberResponse>("/members", payload);
+    return response.data.data.member;
   } catch (error: unknown) {
     throw new Error(
       extractErrorMessage(error, "Tidak dapat menambahkan anggota. Silakan coba lagi."),
@@ -127,17 +127,61 @@ export async function getMembers(
 // NOTE: unconfirmed — assumed to mirror the list item shape directly under
 // `data`, matching the same assumption made for AddMemberResponse. Confirm
 // against a real single-record response.
-type GetMemberByIdResponse = ApiSuccessResponse<Member>;
-
 /**
  * Fetches a single member by id — used for edit/detail views.
  */
 export async function getMemberById(id: string): Promise<Member> {
   try {
     // NOTE: adjust the endpoint path (`/members/${id}`) to match your backend.
-    const response = await api.get<GetMemberByIdResponse>(`/members/${id}`);
-    return response.data.data;
+    const response = await api.get<MemberResponse>(`/members/${id}`);
+    return response.data.data.member;
   } catch (error: unknown) {
     throw new Error(extractErrorMessage(error, DEFAULT_ERROR_MESSAGE));
+  }
+}
+
+interface UpdateMemberPayload {
+  readonly fullName?: string;
+  readonly rt?: string | null;
+  readonly phone?: string | null;
+  readonly picName?: string | null;
+  readonly picPhone?: string | null;
+  readonly isActive?: boolean;
+  readonly unitIds?: readonly string[];
+}
+
+export async function updateMember(id: string, payload: UpdateMemberPayload): Promise<Member> {
+  try {
+    const response = await api.patch<MemberResponse>(`/members/${id}`, payload);
+    return response.data.data.member;
+  } catch (error: unknown) {
+    throw new Error(extractErrorMessage(error, "Data anggota tidak dapat diperbarui."));
+  }
+}
+
+export async function deactivateMember(id: string): Promise<Member> {
+  try {
+    const response = await api.delete<MemberResponse>(`/members/${id}`);
+    return response.data.data.member;
+  } catch (error: unknown) {
+    throw new Error(extractErrorMessage(error, "Anggota tidak dapat dinonaktifkan."));
+  }
+}
+
+export interface MemberSummary {
+  readonly member: Member;
+  readonly statistics: { readonly balance: string; readonly totalDepositAmount: string; readonly totalWeightKg: string; readonly completedTransactions: number };
+  readonly transactions: readonly { readonly id: string; readonly status: "DRAFT" | "FINALIZED" | "COMPLETED" | "CANCELLED" | "VOIDED"; readonly payoutMethod: "DIRECT_CASH" | "SAVINGS" | null; readonly totalWeightKg: string; readonly totalAmount: string; readonly createdAt: string }[];
+  readonly ledgerEntries: readonly { readonly id: string; readonly entryType: "DEPOSIT" | "WITHDRAWAL" | "REVERSAL" | "ADJUSTMENT"; readonly amount: string; readonly referenceKey: string; readonly createdAt: string }[];
+}
+
+type MemberSummaryResponse = ApiSuccessResponse<MemberSummary>;
+
+export async function getMemberSummary(id: string): Promise<MemberSummary> {
+  try {
+    const response = await api.get<MemberSummaryResponse>(`/members/${id}/summary`);
+    return response.data.data;
+  } catch (error: unknown) {
+    throw new Error(extractErrorMessage(error, "Ringkasan anggota tidak dapat dimuat."));
   }
 }
