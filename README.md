@@ -106,13 +106,12 @@ REQUESTED -> APPROVED -> PAID -> debit ledger
 - Riwayat, saldo, statistik, terakhir menabung, dan status aktif.
 - Katalog jenis sampah, kategori material, kondisi, satuan, serta riwayat harga.
 - Pencatatan transaksi multi-item.
-- Impor CSV/XLSX dengan mapping, preview, validasi, dan idempotency.
+- Impor CSV dengan template, preview, validasi, dan idempotency.
 - Pilihan `DIRECT_CASH` atau `SAVINGS`.
 - Ledger rupiah append-only.
 - Opening balance untuk migrasi data lama.
 - Penarikan saldo dengan alur persetujuan dan audit.
 - Nota transaksi dan cetak ulang.
-- Buku tabungan digital melalui token/QR tanpa akun nasabah.
 - Dashboard keaktifan dan rekap per unit.
 - Audit log dan rekonsiliasi saldo.
 
@@ -122,7 +121,6 @@ REQUESTED -> APPROVED -> PAID -> debit ledger
 - Pengingat nasabah yang mendekati status tidak aktif.
 - Ekspor laporan lanjutan.
 - Adjustment saldo terbatas dengan approval dan audit.
-- Form permintaan penjemputan dan status sederhana.
 
 ### Tidak termasuk MVP
 
@@ -416,6 +414,7 @@ docker compose ps
 | `GET` | `/api/transactions` | Daftar transaksi (filter status/nasabah/tanggal) |
 | `GET` | `/api/transactions/:id` | Detail transaksi dan item |
 | `POST` | `/api/transactions` | Membuat transaksi draft multi-item secara idempotent |
+| `POST` | `/api/transactions/import` | Preview dan konfirmasi impor setoran CSV secara idempotent |
 | `PATCH` | `/api/transactions/:id` | Memperbarui transaksi selama masih draft |
 | `POST` | `/api/transactions/:id/finalize` | Mengunci item dan total rupiah |
 | `POST` | `/api/transactions/:id/complete` | Menyelesaikan `DIRECT_CASH` atau `SAVINGS` |
@@ -430,7 +429,8 @@ docker compose ps
 | `GET` | `/api/reports/transactions` | Laporan terfilter untuk tabel, CSV, dan PDF |
 | `GET` | `/api/public/receipts/:token` | Nota transaksi publik tanpa akun nasabah |
 
-Endpoint impor CSV/XLSX dan penjemputan belum diimplementasikan.
+Impor saat ini mendukung CSV hingga 500 baris per batch. XLSX, permintaan
+penjemputan, dan buku tabungan publik tidak termasuk scope aplikasi.
 
 Filter daftar nasabah yang tersedia: `search`, `type`, `unitId`, `isActive`,
 `page`, dan `limit`. Nomor nasabah dibuat oleh backend. Field `picName` wajib
@@ -453,12 +453,11 @@ Fondasi repository sebelumnya dibangun untuk sistem poin dan telah direkonsilias
 - [x] Transaksi draft multi-item, edit, finalisasi, `DIRECT_CASH`, `SAVINGS`, dan pembatalan.
 - [x] Ledger rupiah untuk kredit setoran dan debit penarikan; endpoint `OPENING_BALANCE`, `ADJUSTMENT`, dan reversal belum tersedia.
 - [x] Penarikan tabungan (`REQUESTED -> APPROVED -> PAID` / `REJECTED`).
-- [ ] Impor CSV/XLSX.
+- [x] Impor CSV dengan template, preview validasi, dan idempotency per batch/baris.
 - [x] Nota transaksi publik dan cetak ulang melalui token unik.
 - [x] Dashboard operasional, komposisi sampah, transaksi terbaru, dan nasabah aktif.
 - [x] Laporan transaksi dengan filter, ekspor CSV, dan cetak PDF.
 - [x] Profil pengguna serta organisasi dan sidebar dinamis.
-- [ ] Permintaan penjemputan P1.
 
 ## Quality Gate
 

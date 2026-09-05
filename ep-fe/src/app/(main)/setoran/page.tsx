@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronDown, ChevronUp, FileText, Pencil, Plus, Search, X } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, FileText, Pencil, Plus, Search, Upload, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
@@ -92,6 +92,7 @@ export default function Setoran() {
     <div className="flex shrink-0 flex-col gap-4 lg:flex-row lg:items-center">
       <div className="relative flex-1"><Search size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Cari nama warga atau jenis sampah" className="w-full rounded-xl border border-gray-200 bg-white py-3 pl-11 pr-4 text-sm text-gray-900 outline-none focus:border-primary" /></div>
       <select value={status} onChange={(event) => { setStatus(event.target.value as TransactionStatus | ""); setPage(1); }} className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 outline-none focus:border-primary"><option value="">Semua status</option>{Object.entries(STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+      <button type="button" onClick={() => router.push("/setoran/import")} className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-primary bg-white px-5 py-3 text-sm font-semibold text-primary hover:bg-primary/5">Impor CSV <Upload size={16} /></button>
       <button type="button" onClick={() => router.push("/setoran/tambah-setoran")} className="flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white hover:bg-primary/80 cursor-pointer">Tambah Setoran <Plus size={16} /></button>
     </div>
 
