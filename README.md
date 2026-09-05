@@ -8,7 +8,7 @@
 
 EcoPoin adalah platform web untuk mengubah catatan transaksi bank sampah yang datar dan tercampur menjadi profil nasabah, saldo, buku tabungan digital, riwayat aktivitas, serta rekap individu dan unit yang dapat ditelusuri.
 
-Produk mendukung dua pola adopsi:
+Produk dirancang untuk mendukung dua pola adopsi:
 
 - bank sampah yang masih manual dapat mencatat transaksi langsung di EcoPoin;
 - bank sampah yang sudah komputerisasi dapat mengimpor CSV/XLSX tanpa mengganti sistem operasionalnya secara paksa.
@@ -104,13 +104,13 @@ REQUESTED -> APPROVED -> PAID -> debit ledger
 - Profil nasabah bertipe `INDIVIDUAL` atau `UNIT`.
 - Relasi individu-unit tanpa mencampur kepemilikan transaksi.
 - Riwayat, saldo, statistik, terakhir menabung, dan status aktif.
-- Katalog jenis sampah, kondisi, foto, satuan, serta riwayat harga.
+- Katalog jenis sampah, kategori material, kondisi, satuan, serta riwayat harga.
 - Pencatatan transaksi multi-item.
 - Impor CSV/XLSX dengan mapping, preview, validasi, dan idempotency.
 - Pilihan `DIRECT_CASH` atau `SAVINGS`.
 - Ledger rupiah append-only.
 - Opening balance untuk migrasi data lama.
-- Penarikan saldo dan bukti penarikan.
+- Penarikan saldo dengan alur persetujuan dan audit.
 - Nota transaksi dan cetak ulang.
 - Buku tabungan digital melalui token/QR tanpa akun nasabah.
 - Dashboard keaktifan dan rekap per unit.
@@ -393,63 +393,71 @@ docker compose ps
 | Frontend | `http://localhost:3100` | `3000` |
 | Backend | `http://localhost:3101` | `3001` |
 
-## API yang Direncanakan
+## API
 
 | Method | Endpoint | Keterangan |
 | --- | --- | --- |
 | `POST` | `/api/auth/login` | Login pengurus |
+| `POST` | `/api/auth/logout` | Logout dan menghapus sesi cookie |
+| `GET` | `/api/auth/me` | Memeriksa sesi pengguna aktif |
+| `GET` | `/api/profile` | Profil pengguna dan organisasi |
+| `PATCH` | `/api/profile` | Memperbarui profil; data organisasi khusus admin |
 | `GET` | `/api/members` | Cari individu/unit dan status aktif |
 | `POST` | `/api/members` | Membuat profil individu/unit dan nomor unik |
 | `GET` | `/api/members/:id` | Detail profil dan relasi unit |
 | `PATCH` | `/api/members/:id` | Memperbarui profil atau relasi unit |
 | `DELETE` | `/api/members/:id` | Menonaktifkan profil tanpa menghapus history |
-| `GET` | `/api/members/:id/balance` | Saldo tabungan, dihitung dari agregasi ledger |
+| `GET` | `/api/members/:id/summary` | Detail, transaksi, mutasi, dan saldo nasabah |
 | `GET` | `/api/waste-types` | Katalog jenis sampah |
-| `GET` | `/api/waste-types/:id/prices` | Riwayat harga berversi per jenis sampah |
-| `POST` | `/api/waste-types/:id/prices` | Menambah harga baru (menutup versi lama) |
-| `GET` | `/api/waste-types/:id/prices/active` | Harga aktif untuk skema tertentu |
+| `POST` | `/api/waste-types` | Membuat jenis sampah dan dua kondisi harga |
+| `GET` | `/api/waste-types/:id` | Detail jenis sampah dan harga aktif |
+| `PATCH` | `/api/waste-types/:id` | Memperbarui master dan membuat versi harga baru |
+| `DELETE` | `/api/waste-types/:id` | Menonaktifkan jenis sampah tanpa menghapus histori |
 | `GET` | `/api/transactions` | Daftar transaksi (filter status/nasabah/tanggal) |
 | `GET` | `/api/transactions/:id` | Detail transaksi dan item |
-| `POST` | `/api/transactions` | Membuat transaksi draft *(belum diimplementasikan)* |
+| `POST` | `/api/transactions` | Membuat transaksi draft multi-item secara idempotent |
+| `PATCH` | `/api/transactions/:id` | Memperbarui transaksi selama masih draft |
 | `POST` | `/api/transactions/:id/finalize` | Mengunci item dan total rupiah |
-| `POST` | `/api/transactions/:id/settle` | Menyelesaikan `DIRECT_CASH` atau `SAVINGS` |
+| `POST` | `/api/transactions/:id/complete` | Menyelesaikan `DIRECT_CASH` atau `SAVINGS` |
 | `POST` | `/api/transactions/:id/cancel` | Membatalkan draft/finalized + alasan |
-| `POST` | `/api/imports` | Mengunggah dan memvalidasi data lama *(belum diimplementasikan)* |
 | `GET` | `/api/ledger` | Melihat mutasi ledger terfilter |
 | `GET` | `/api/withdrawals` | Daftar penarikan |
 | `POST` | `/api/withdrawals` | Mengajukan penarikan (`REQUESTED`) |
 | `POST` | `/api/withdrawals/:id/approve` | Menyetujui penarikan |
 | `POST` | `/api/withdrawals/:id/pay` | Membayar dan membuat debit atomik |
 | `POST` | `/api/withdrawals/:id/reject` | Menolak penarikan + alasan |
-| `GET` | `/api/reports/units` | Rekap unit dan keaktifan *(belum diimplementasikan)* |
-| `GET` | `/api/passbook/:token` | Buku tabungan publik, tanpa login |
+| `GET` | `/api/dashboard` | Ringkasan transaksi, pencairan, dan komposisi sampah |
+| `GET` | `/api/reports/transactions` | Laporan terfilter untuk tabel, CSV, dan PDF |
+| `GET` | `/api/public/receipts/:token` | Nota transaksi publik tanpa akun nasabah |
+
+Endpoint impor CSV/XLSX dan penjemputan belum diimplementasikan.
 
 Filter daftar nasabah yang tersedia: `search`, `type`, `unitId`, `isActive`,
 `page`, dan `limit`. Nomor nasabah dibuat oleh backend. Field `picName` wajib
 untuk tipe `UNIT`, sedangkan `unitIds` hanya digunakan untuk menghubungkan
-profil `INDIVIDUAL` ke satu atau beberapa unit. Saldo tersedia lewat endpoint
-terpisah (`/api/members/:id/balance`), bukan tertanam di detail profil.
-Pembuatan transaksi draft (form input setoran) masih menunggu keputusan tim
-soal alur input di lapangan — endpoint yang sudah ada beroperasi pada
-transaksi yang sudah ada (lihat `prisma/seed-phase3-test-data.sql` untuk
-men-seed transaksi dan penarikan uji coba).
+profil `INDIVIDUAL` ke satu atau beberapa unit. Saldo dan histori tersedia
+melalui `/api/members/:id/summary`. Pembuatan draft, perubahan item,
+finalisasi, pencairan, pembatalan, dan nota sudah terhubung dari frontend ke
+backend.
 
 ## Status Implementasi
 
-Fondasi repository sebelumnya dibangun untuk sistem poin. Modul deposit/ledger/redemption/passbook (sesi 3) sudah dimigrasikan ke domain rupiah di bawah ini; pembuatan transaksi draft (form input setoran) masih menunggu keputusan tim soal alur input di lapangan.
+Fondasi repository sebelumnya dibangun untuk sistem poin dan telah direkonsiliasi ke domain rupiah berdasarkan PRD v3.0.
 
 - [x] Fondasi PostgreSQL, constraint, index, trigger, dan RLS.
 - [x] Autentikasi pengurus dan identitas organisasi.
 - [x] Docker Compose, health check, dan CI GitHub Actions.
 - [x] Master awal jenis sampah.
-- [x] Migrasi `points_per_kg` menjadi harga rupiah berversi dan skema harga (`waste_price_versions`).
+- [x] Migrasi `points_per_kg` menjadi harga rupiah berversi untuk kondisi `SORTED` dan `UNSORTED`.
 - [x] Profil `INDIVIDUAL` dan `UNIT`, relasi unit, filter, dan soft-delete.
-- [x] Transaksi `DIRECT_CASH` dan `SAVINGS` — finalize/settle/cancel sudah ada; pembuatan draft belum.
-- [x] Ledger rupiah dan reversal (skema + trigger); pembuatan entri `OPENING_BALANCE`/`ADJUSTMENT` belum ada endpoint-nya.
+- [x] Transaksi draft multi-item, edit, finalisasi, `DIRECT_CASH`, `SAVINGS`, dan pembatalan.
+- [x] Ledger rupiah untuk kredit setoran dan debit penarikan; endpoint `OPENING_BALANCE`, `ADJUSTMENT`, dan reversal belum tersedia.
 - [x] Penarikan tabungan (`REQUESTED -> APPROVED -> PAID` / `REJECTED`).
 - [ ] Impor CSV/XLSX.
-- [x] Buku tabungan digital (passbook publik via token), dalam rupiah. Cetak nota belum ada.
-- [ ] Dashboard keaktifan serta rekap unit.
+- [x] Nota transaksi publik dan cetak ulang melalui token unik.
+- [x] Dashboard operasional, komposisi sampah, transaksi terbaru, dan nasabah aktif.
+- [x] Laporan transaksi dengan filter, ekspor CSV, dan cetak PDF.
+- [x] Profil pengguna serta organisasi dan sidebar dinamis.
 - [ ] Permintaan penjemputan P1.
 
 ## Quality Gate
@@ -457,12 +465,12 @@ Fondasi repository sebelumnya dibangun untuk sistem poin. Modul deposit/ledger/r
 ```bash
 cd ep-fe
 npm run lint
-npx tsc --noEmit
+npm run type-check
 npm run build
 
 cd ../ep-be
 npm run lint
-npx tsc --noEmit
+npm run type-check
 npm run build
 ```
 
