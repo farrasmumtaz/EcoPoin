@@ -31,7 +31,9 @@ export default function ProfilePage() {
         fullName: form.fullName.trim(),
         ...(profile?.role === "ADMIN" ? { organizationName: form.organizationName.trim(), address: form.address.trim() || null, contactPhone: form.contactPhone.trim() || null } : {}),
       });
-      setProfile(updated); setForm(formFrom(updated)); toast.success("Profil berhasil diperbarui.");
+      setProfile(updated); setForm(formFrom(updated));
+      window.dispatchEvent(new CustomEvent<Profile>("ecopoin:profile-updated", { detail: updated }));
+      toast.success("Profil berhasil diperbarui.");
     } catch (error: unknown) { toast.error(error instanceof Error ? error.message : "Profil gagal disimpan."); }
     finally { setSaving(false); }
   };

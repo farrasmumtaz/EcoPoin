@@ -3,7 +3,6 @@
 import {
   ChevronLeft,
   ChevronRight,
-  CircleUserRound,
   CircleDollarSign,
   FileText,
   HandCoins,
@@ -13,11 +12,12 @@ import {
   Recycle,
   Users,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import toast from "react-hot-toast";
 
 import { useAuthStore } from "../services/auth/authStore";
+import { getProfile, type Profile } from "../services/profile/profile";
 
 interface MenuItem {
   label: string;
@@ -50,12 +50,36 @@ const menuSections: MenuSection[] = [
   },
 ];
 
+const roleLabels: Record<Profile["role"], string> = {
+  ADMIN: "Administrator",
+  OPERATOR: "Operator",
+  COORDINATOR: "Koordinator",
+};
+
 export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const logout = useAuthStore((state) => state.logout);
+  const authenticatedUser = useAuthStore((state) => state.user);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [profile, setProfile] = useState<Profile | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void getProfile().then((result) => { if (active) setProfile(result); }).catch(() => undefined);
+    const handleProfileUpdate = (event: Event): void => {
+      const customEvent = event as CustomEvent<Profile>;
+      setProfile(customEvent.detail);
+    };
+    window.addEventListener("ecopoin:profile-updated", handleProfileUpdate);
+    return () => { active = false; window.removeEventListener("ecopoin:profile-updated", handleProfileUpdate); };
+  }, []);
+
+  const displayName = profile?.fullName ?? authenticatedUser?.email ?? "Pengguna EcoPoin";
+  const displayRole = profile ? roleLabels[profile.role] : authenticatedUser?.role ?? "Memuat profil";
+  const organizationName = profile?.organization.name ?? "EcoPoin";
+  const initials = displayName.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "EP";
 
   const handleLogout = async (): Promise<void> => {
     if (isLoggingOut) return;
@@ -86,9 +110,7 @@ export default function Sidebar() {
         }`}
       >
         {!collapsed && (
-          <h1 className="text-primary font-bold text-xl tracking-wide">
-            ECOPOIN
-          </h1>
+          <div className="min-w-0"><h1 className="text-primary font-bold text-xl tracking-wide">ECOPOIN</h1><p className="truncate text-[11px] text-neutral-500" title={organizationName}>{organizationName}</p></div>
         )}
         <button
           onClick={() => setCollapsed((prev) => !prev)}
@@ -147,12 +169,10 @@ export default function Sidebar() {
               className="flex flex-1 items-center gap-3 min-w-0 cursor-pointer text-left"
               aria-label="Lihat profil"
             >
-              <CircleUserRound className="h-10 w-10 shrink-0 text-neutral-500" aria-label="User avatar" />
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-sm font-bold text-primary" aria-label="Inisial pengguna">{initials}</span>
               <div className="flex-1 min-w-0">
-                <p className="text-xs text-neutral-500 leading-tight">RT.2</p>
-                <p className="text-sm font-semibold text-neutral-800 leading-tight truncate">
-                  Hj. Kimi
-                </p>
+                <p className="truncate text-xs leading-tight text-neutral-500">{displayRole}</p>
+                <p className="truncate text-sm font-semibold leading-tight text-neutral-800" title={displayName}>{displayName}</p>
               </div>
             </button>
             <button
@@ -171,7 +191,7 @@ export default function Sidebar() {
               className="cursor-pointer"
               aria-label="Lihat profil"
             >
-              <CircleUserRound className="h-10 w-10 text-neutral-500" aria-label="User avatar" />
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-sm font-bold text-primary" title={`${displayName} · ${displayRole}`}>{initials}</span>
             </button>
             <button
               onClick={handleLogout}
