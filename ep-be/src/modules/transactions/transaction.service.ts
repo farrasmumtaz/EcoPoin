@@ -124,6 +124,14 @@ export async function listTransactions(
   const prisma = getPrisma();
   const where: Prisma.TransactionWhereInput = {
     organizationId,
+    ...(input.search
+      ? {
+          OR: [
+            { member: { fullName: { contains: input.search, mode: "insensitive" } } },
+            { items: { some: { wasteTypeNameSnapshot: { contains: input.search, mode: "insensitive" } } } },
+          ],
+        }
+      : {}),
     ...(input.memberId ? { memberId: input.memberId } : {}),
     ...(input.status ? { status: input.status } : {}),
     ...(input.dateFrom || input.dateTo

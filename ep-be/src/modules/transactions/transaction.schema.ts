@@ -35,6 +35,7 @@ export const cancelTransactionSchema = z.object({
 export const transactionIdSchema = z.uuid();
 
 export const listTransactionsSchema = z.object({
+  search: z.string().trim().max(100).optional(),
   memberId: z.uuid().optional(),
   status: z
     .enum(["DRAFT", "FINALIZED", "COMPLETED", "CANCELLED", "VOIDED"])
