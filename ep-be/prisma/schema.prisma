@@ -39,19 +39,12 @@ enum WasteCondition {
   @@map("waste_condition")
 }
 
-enum DepositStatus {
-  DRAFT
-  VERIFIED
-  REJECTED
-
-  @@map("settlement_method")
-}
-
 enum TransactionStatus {
   DRAFT
   FINALIZED
   COMPLETED
   CANCELLED
+  VOIDED
 
   @@map("transaction_status")
 }
@@ -63,26 +56,6 @@ enum WithdrawalStatus {
   REJECTED
 
   @@map("withdrawal_status")
-}
-
-enum LedgerEntryType {
-  DEPOSIT
-  WITHDRAWAL
-  OPENING_BALANCE
-  REVERSAL
-  ADJUSTMENT
-
-  @@map("ledger_entry_type")
-}
-
-enum TransactionStatus {
-  DRAFT
-  FINALIZED
-  COMPLETED
-  CANCELLED
-  VOIDED
-
-  @@map("transaction_status")
 }
 
 enum TransactionSource {
@@ -108,15 +81,6 @@ enum FinancialLedgerEntryType {
   @@map("financial_ledger_entry_type")
 }
 
-enum WithdrawalStatus {
-  REQUESTED
-  APPROVED
-  PAID
-  REJECTED
-
-  @@map("withdrawal_status")
-}
-
 model Organization {
   id                    String   @id @default(uuid()) @db.Uuid
   name                  String   @db.VarChar(160)
@@ -130,14 +94,11 @@ model Organization {
   members             Member[]
   wasteTypes          WasteType[]
   transactions        Transaction[]
-  ledgerEntries       LedgerEntry[]
+  financialLedger     FinancialLedger[]
   withdrawals         Withdrawal[]
   auditLogs           AuditLog[]
   memberRelationships MemberRelationship[]
-  transactions        Transaction[]
-  financialLedger     FinancialLedger[]
   wastePriceVersions  WastePriceVersion[]
-  withdrawals         Withdrawal[]
 
   @@map("organizations")
 }
@@ -153,10 +114,6 @@ model Profile {
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   organization           Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  createdDeposits        Deposit[]           @relation("DepositCreatedBy")
-  verifiedDeposits       Deposit[]           @relation("DepositVerifiedBy")
-  createdRedemptions     Redemption[]        @relation("RedemptionCreatedBy")
-  cancelledRedemptions   Redemption[]        @relation("RedemptionCancelledBy")
   auditLogs              AuditLog[]          @relation("AuditActor")
   createdTransactions    Transaction[]       @relation("TransactionCreatedBy")
   finalizedTransactions  Transaction[]       @relation("TransactionFinalizedBy")
@@ -189,13 +146,10 @@ model Member {
 
   organization            Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   transactions            Transaction[]
-  ledgerEntries           LedgerEntry[]
+  financialLedger         FinancialLedger[]
   withdrawals             Withdrawal[]
   individualRelationships MemberRelationship[] @relation("RelationshipIndividual")
   unitRelationships       MemberRelationship[] @relation("RelationshipUnit")
-  transactions            Transaction[]
-  financialLedger         FinancialLedger[]
-  withdrawals             Withdrawal[]
 
   @@unique([organizationId, memberNumber])
   @@index([organizationId, type, isActive, fullName])
@@ -234,7 +188,6 @@ model WasteType {
 
   organization     Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   impactFactors    ImpactFactor[]
-  depositItems     DepositItem[]
   transactionItems TransactionItem[]
   priceVersions    WastePriceVersion[]
 
@@ -250,38 +203,6 @@ model WasteType {
 // field-research question (see root README "Validasi Sebelum Feature
 // Freeze"). Default "STANDARD" means "one price regardless of method" until
 // that's confirmed.
-model WastePriceVersion {
-  id             String    @id @default(uuid()) @db.Uuid
-  wasteTypeId    String    @map("waste_type_id") @db.Uuid
-  priceScheme    String    @default("STANDARD") @map("price_scheme") @db.VarChar(40)
-  pricePerKg     Decimal   @map("price_per_kg") @db.Decimal(14, 2)
-  effectiveFrom  DateTime  @default(now()) @map("effective_from") @db.Timestamptz(3)
-  effectiveUntil DateTime? @map("effective_until") @db.Timestamptz(3)
-  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
-
-  wasteType WasteType @relation(fields: [wasteTypeId], references: [id], onDelete: Restrict)
-
-  @@index([wasteTypeId, priceScheme, effectiveFrom])
-  @@map("waste_price_versions")
-}
-
-model ImpactFactor {
-  id               String   @id @default(uuid()) @db.Uuid
-  wasteTypeId      String   @map("waste_type_id") @db.Uuid
-  factorValue      Decimal  @map("factor_value") @db.Decimal(18, 6)
-  unit             String   @db.VarChar(80)
-  sourceUrl        String   @map("source_url") @db.Text
-  sourceAccessedAt DateTime @map("source_accessed_at") @db.Date
-  isActive         Boolean  @default(true) @map("is_active")
-  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
-
-  wasteType WasteType @relation(fields: [wasteTypeId], references: [id], onDelete: Restrict)
-
-  @@index([wasteTypeId, isActive])
-  @@map("impact_factors")
-}
-
 model WastePriceVersion {
   id             String         @id @default(uuid()) @db.Uuid
   organizationId String         @map("organization_id") @db.Uuid
@@ -301,100 +222,21 @@ model WastePriceVersion {
   @@map("waste_price_versions")
 }
 
-model Deposit {
-  id              String        @id @default(uuid()) @db.Uuid
-  organizationId  String        @map("organization_id") @db.Uuid
-  memberId        String        @map("member_id") @db.Uuid
-  status          DepositStatus @default(DRAFT)
-  receiptToken    String        @unique @default(uuid()) @map("receipt_token") @db.Uuid
-  clientUuid      String        @map("client_uuid") @db.Uuid
-  createdBy       String        @map("created_by") @db.Uuid
-  verifiedBy      String?       @map("verified_by") @db.Uuid
-  verifiedAt      DateTime?     @map("verified_at") @db.Timestamptz(3)
-  rejectionReason String?       @map("rejection_reason") @db.VarChar(500)
-  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+model ImpactFactor {
+  id               String   @id @default(uuid()) @db.Uuid
+  wasteTypeId      String   @map("waste_type_id") @db.Uuid
+  factorValue      Decimal  @map("factor_value") @db.Decimal(18, 6)
+  unit             String   @db.VarChar(80)
+  sourceUrl        String   @map("source_url") @db.Text
+  sourceAccessedAt DateTime @map("source_accessed_at") @db.Date
+  isActive         Boolean  @default(true) @map("is_active")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  member       Member        @relation(fields: [memberId], references: [id], onDelete: Restrict)
-  creator      Profile       @relation("DepositCreatedBy", fields: [createdBy], references: [id], onDelete: Restrict)
-  verifier     Profile?      @relation("DepositVerifiedBy", fields: [verifiedBy], references: [id], onDelete: Restrict)
-  items        DepositItem[]
+  wasteType WasteType @relation(fields: [wasteTypeId], references: [id], onDelete: Restrict)
 
-  @@unique([organizationId, clientUuid])
-  @@index([organizationId, status, createdAt])
-  @@index([organizationId, memberId, createdAt])
-  @@map("transactions")
-}
-
-model TransactionItem {
-  id                 String  @id @default(uuid()) @db.Uuid
-  transactionId      String  @map("transaction_id") @db.Uuid
-  wasteTypeId        String  @map("waste_type_id") @db.Uuid
-  weightKg           Decimal @map("weight_kg") @db.Decimal(12, 3)
-  pricePerKgSnapshot Decimal @map("price_per_kg_snapshot") @db.Decimal(14, 2)
-  subtotalRupiah     Decimal @map("subtotal_rupiah") @db.Decimal(16, 2)
-
-  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
-  wasteType   WasteType   @relation(fields: [wasteTypeId], references: [id], onDelete: Restrict)
-
-  @@unique([transactionId, wasteTypeId])
-  @@index([wasteTypeId])
-  @@map("transaction_items")
-}
-
-model LedgerEntry {
-  id             String          @id @default(uuid()) @db.Uuid
-  organizationId String          @map("organization_id") @db.Uuid
-  memberId       String          @map("member_id") @db.Uuid
-  entryType      LedgerEntryType @map("entry_type")
-  amountRupiah   Decimal         @map("amount_rupiah") @db.Decimal(16, 2)
-  sourceId       String          @map("source_id") @db.Uuid
-  reversalOfId   String?         @unique @map("reversal_of_id") @db.Uuid
-  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
-
-  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  member       Member        @relation(fields: [memberId], references: [id], onDelete: Restrict)
-  reversalOf   LedgerEntry?  @relation("LedgerReversal", fields: [reversalOfId], references: [id], onDelete: Restrict)
-  reversedBy   LedgerEntry[] @relation("LedgerReversal")
-
-  @@unique([organizationId, entryType, sourceId])
-  @@index([organizationId, memberId, createdAt])
-  @@map("ledger_entries")
-}
-
-// PRD v3.0: replaces the old immediate-debit Redemption. Withdrawals use a
-// separate REQUESTED -> APPROVED -> PAID flow (or REJECTED); the ledger debit
-// only happens at PAID, with the balance re-checked inside that same DB
-// transaction - see root README "Model Ledger" and "Aturan Bisnis Kritis".
-model Withdrawal {
-  id              String           @id @default(uuid()) @db.Uuid
-  organizationId  String           @map("organization_id") @db.Uuid
-  memberId        String           @map("member_id") @db.Uuid
-  amountRupiah    Decimal          @map("amount_rupiah") @db.Decimal(16, 2)
-  status          WithdrawalStatus @default(REQUESTED)
-  notes           String?          @db.VarChar(500)
-  proofPath       String?          @map("proof_path") @db.Text
-  createdBy       String           @map("created_by") @db.Uuid
-  approvedBy      String?          @map("approved_by") @db.Uuid
-  approvedAt      DateTime?        @map("approved_at") @db.Timestamptz(3)
-  paidBy          String?          @map("paid_by") @db.Uuid
-  paidAt          DateTime?        @map("paid_at") @db.Timestamptz(3)
-  rejectedBy      String?          @map("rejected_by") @db.Uuid
-  rejectedAt      DateTime?        @map("rejected_at") @db.Timestamptz(3)
-  rejectionReason String?          @map("rejection_reason") @db.VarChar(500)
-  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  member       Member       @relation(fields: [memberId], references: [id], onDelete: Restrict)
-  creator      Profile      @relation("WithdrawalCreatedBy", fields: [createdBy], references: [id], onDelete: Restrict)
-  approver     Profile?     @relation("WithdrawalApprovedBy", fields: [approvedBy], references: [id], onDelete: Restrict)
-  payer        Profile?     @relation("WithdrawalPaidBy", fields: [paidBy], references: [id], onDelete: Restrict)
-  rejecter     Profile?     @relation("WithdrawalRejectedBy", fields: [rejectedBy], references: [id], onDelete: Restrict)
-
-  @@index([organizationId, memberId, createdAt])
-  @@index([organizationId, status, createdAt])
-  @@map("withdrawals")
+  @@index([wasteTypeId, isActive])
+  @@map("impact_factors")
 }
 
 model AuditLog {
@@ -514,11 +356,11 @@ model Withdrawal {
   createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt       DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  member       Member            @relation(fields: [memberId], references: [id], onDelete: Restrict)
-  requester    Profile           @relation("WithdrawalRequestedBy", fields: [requestedBy], references: [id], onDelete: Restrict)
-  approver     Profile?          @relation("WithdrawalApprovedBy", fields: [approvedBy], references: [id], onDelete: Restrict)
-  payer        Profile?          @relation("WithdrawalPaidBy", fields: [paidBy], references: [id], onDelete: Restrict)
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  member       Member           @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  requester    Profile          @relation("WithdrawalRequestedBy", fields: [requestedBy], references: [id], onDelete: Restrict)
+  approver     Profile?         @relation("WithdrawalApprovedBy", fields: [approvedBy], references: [id], onDelete: Restrict)
+  payer        Profile?         @relation("WithdrawalPaidBy", fields: [paidBy], references: [id], onDelete: Restrict)
   ledgerEntry  FinancialLedger?
 
   @@index([organizationId, status, createdAt])

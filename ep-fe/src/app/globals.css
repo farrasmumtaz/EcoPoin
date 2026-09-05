@@ -23,6 +23,21 @@ body {
   font-family: var(--font-poppins);
 }
 
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 12mm;
+  }
+
+  .app-sidebar {
+    display: none !important;
+  }
+
+  body {
+    background: #ffffff;
+  }
+}
+
 @layer base {
   table {
     color: #1f2937;
