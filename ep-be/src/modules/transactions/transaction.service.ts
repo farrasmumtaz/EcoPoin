@@ -76,7 +76,6 @@ async function buildItems(organizationId: string, input: readonly ItemInput[]) {
           OR: [{ effectiveUntil: null }, { effectiveUntil: { gt: pricedAt } }],
         },
         orderBy: { effectiveFrom: "desc" },
-        take: 1,
       },
     },
   });

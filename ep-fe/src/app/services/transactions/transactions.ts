@@ -79,6 +79,36 @@ interface GetTransactionsParams {
   readonly limit?: number;
 }
 
+export interface TransactionImportRow {
+  readonly rowNumber: number;
+  readonly memberNumber: string;
+  readonly wasteTypeName: string;
+  readonly condition: "SORTED" | "UNSORTED";
+  readonly weightKg: number;
+  readonly payoutMethod: "DIRECT_CASH" | "SAVINGS";
+  readonly notes?: string;
+}
+
+export interface TransactionImportRowResult {
+  readonly rowNumber: number;
+  readonly valid: boolean;
+  readonly errors: readonly string[];
+  readonly memberName: string | null;
+  readonly wasteTypeName: string | null;
+  readonly pricePerKg: string | null;
+  readonly subtotalAmount: string | null;
+  readonly transactionId: string | null;
+}
+
+export interface TransactionImportResult {
+  readonly batchId: string;
+  readonly dryRun: boolean;
+  readonly validRows: number;
+  readonly invalidRows: number;
+  readonly importedRows: number;
+  readonly rows: readonly TransactionImportRowResult[];
+}
+
 function messageFrom(error: unknown): string {
   if (axios.isAxiosError<ApiErrorResponse>(error)) {
     return error.response?.data.error.message ?? "Transaksi tidak dapat disimpan.";
@@ -152,6 +182,23 @@ export async function cancelTransaction(id: string, reason: string): Promise<Tra
   try {
     const response = await api.post<TransactionResponse>(`/transactions/${id}/cancel`, { reason });
     return response.data.data.transaction;
+  } catch (error: unknown) {
+    throw new Error(messageFrom(error));
+  }
+}
+
+export async function importTransactions(
+  batchId: string,
+  rows: readonly TransactionImportRow[],
+  dryRun: boolean,
+): Promise<TransactionImportResult> {
+  try {
+    const response = await api.post<ApiSuccessResponse<TransactionImportResult>>("/transactions/import", {
+      batchId,
+      dryRun,
+      rows,
+    });
+    return response.data.data;
   } catch (error: unknown) {
     throw new Error(messageFrom(error));
   }

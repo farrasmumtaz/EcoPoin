@@ -23,7 +23,6 @@ function getActivePriceInclude() {
         OR: [{ effectiveUntil: null }, { effectiveUntil: { gt: now } }],
       },
       orderBy: { effectiveFrom: "desc" },
-      take: 1,
     },
   } satisfies Prisma.WasteTypeInclude;
 }
