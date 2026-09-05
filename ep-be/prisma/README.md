@@ -40,25 +40,27 @@ service-role key. Never allow a browser client to update `app_metadata`.
 
 ## Ledger convention
 
-`point_ledger.points` is signed:
+`ledger_entries.amount_rupiah` is signed:
 
-- `CREDIT`: positive;
-- `DEBIT`: negative;
-- `REVERSAL`: the exact negation of the referenced entry.
+- `DEPOSIT` / `OPENING_BALANCE`: positive;
+- `WITHDRAWAL`: negative;
+- `REVERSAL`: the exact negation of the referenced entry;
+- `ADJUSTMENT`: either sign, per the correction being made.
 
 Therefore a member balance is always:
 
 ```sql
-SELECT COALESCE(SUM(points), 0)
-FROM point_ledger
+SELECT COALESCE(SUM(amount_rupiah), 0)
+FROM ledger_entries
 WHERE organization_id = $1 AND member_id = $2;
 ```
 
 The database prevents duplicate source entries, multiple reversals of the same
-entry, mutation of ledger/audit rows, and edits to finalized deposits.
+entry, mutation of ledger/audit rows, and edits to completed or cancelled
+transactions.
 
 ## Public receipts
 
-There is intentionally no anonymous RLS policy on `members` or `deposits`.
+There is intentionally no anonymous RLS policy on `members` or `transactions`.
 Public receipt/member-token endpoints must run on the backend, validate the
 random token, and return a privacy-filtered response.

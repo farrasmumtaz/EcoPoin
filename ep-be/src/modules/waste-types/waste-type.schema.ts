@@ -33,6 +33,27 @@ export const listWasteTypesSchema = z.object({
   limit: z.coerce.number().int().positive().max(100).default(20),
 });
 
+const priceSchemeSchema = z.string().trim().min(1).max(40).default("STANDARD");
+
+export const createPriceVersionSchema = z.object({
+  priceScheme: priceSchemeSchema,
+  pricePerKg: z.coerce.number().positive().max(999_999_999_999.99),
+  effectiveFrom: z.coerce.date().optional(),
+});
+
+export const listPriceVersionsSchema = z.object({
+  priceScheme: z.string().trim().max(40).optional(),
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(100).default(20),
+});
+
+export const activePriceQuerySchema = z.object({
+  priceScheme: priceSchemeSchema,
+});
+
 export type CreateWasteTypeInput = z.infer<typeof createWasteTypeSchema>;
 export type UpdateWasteTypeInput = z.infer<typeof updateWasteTypeSchema>;
 export type ListWasteTypesInput = z.infer<typeof listWasteTypesSchema>;
+export type CreatePriceVersionInput = z.infer<typeof createPriceVersionSchema>;
+export type ListPriceVersionsInput = z.infer<typeof listPriceVersionsSchema>;
+export type ActivePriceQueryInput = z.infer<typeof activePriceQuerySchema>;

@@ -403,37 +403,52 @@ docker compose ps
 | `GET` | `/api/members/:id` | Detail profil dan relasi unit |
 | `PATCH` | `/api/members/:id` | Memperbarui profil atau relasi unit |
 | `DELETE` | `/api/members/:id` | Menonaktifkan profil tanpa menghapus history |
-| `POST` | `/api/transactions` | Membuat transaksi draft |
-| `POST` | `/api/transactions/:id/finalize` | Mengunci item dan total |
-| `POST` | `/api/transactions/:id/settle` | Menyelesaikan tunai/tabungan |
-| `POST` | `/api/imports` | Mengunggah dan memvalidasi data lama |
-| `GET` | `/api/ledger` | Melihat mutasi terfilter |
-| `POST` | `/api/withdrawals` | Membuat permintaan penarikan |
+| `GET` | `/api/members/:id/balance` | Saldo tabungan, dihitung dari agregasi ledger |
+| `GET` | `/api/waste-types` | Katalog jenis sampah |
+| `GET` | `/api/waste-types/:id/prices` | Riwayat harga berversi per jenis sampah |
+| `POST` | `/api/waste-types/:id/prices` | Menambah harga baru (menutup versi lama) |
+| `GET` | `/api/waste-types/:id/prices/active` | Harga aktif untuk skema tertentu |
+| `GET` | `/api/transactions` | Daftar transaksi (filter status/nasabah/tanggal) |
+| `GET` | `/api/transactions/:id` | Detail transaksi dan item |
+| `POST` | `/api/transactions` | Membuat transaksi draft *(belum diimplementasikan)* |
+| `POST` | `/api/transactions/:id/finalize` | Mengunci item dan total rupiah |
+| `POST` | `/api/transactions/:id/settle` | Menyelesaikan `DIRECT_CASH` atau `SAVINGS` |
+| `POST` | `/api/transactions/:id/cancel` | Membatalkan draft/finalized + alasan |
+| `POST` | `/api/imports` | Mengunggah dan memvalidasi data lama *(belum diimplementasikan)* |
+| `GET` | `/api/ledger` | Melihat mutasi ledger terfilter |
+| `GET` | `/api/withdrawals` | Daftar penarikan |
+| `POST` | `/api/withdrawals` | Mengajukan penarikan (`REQUESTED`) |
+| `POST` | `/api/withdrawals/:id/approve` | Menyetujui penarikan |
 | `POST` | `/api/withdrawals/:id/pay` | Membayar dan membuat debit atomik |
-| `GET` | `/api/reports/units` | Rekap unit dan keaktifan |
-| `GET` | `/passbook/:token` | Buku tabungan publik |
+| `POST` | `/api/withdrawals/:id/reject` | Menolak penarikan + alasan |
+| `GET` | `/api/reports/units` | Rekap unit dan keaktifan *(belum diimplementasikan)* |
+| `GET` | `/api/passbook/:token` | Buku tabungan publik, tanpa login |
 
 Filter daftar nasabah yang tersedia: `search`, `type`, `unitId`, `isActive`,
 `page`, dan `limit`. Nomor nasabah dibuat oleh backend. Field `picName` wajib
 untuk tipe `UNIT`, sedangkan `unitIds` hanya digunakan untuk menghubungkan
-profil `INDIVIDUAL` ke satu atau beberapa unit. Saldo, transaksi, dan mutasi
-belum dikembalikan oleh detail profil sampai migrasi domain finansial v3 selesai.
+profil `INDIVIDUAL` ke satu atau beberapa unit. Saldo tersedia lewat endpoint
+terpisah (`/api/members/:id/balance`), bukan tertanam di detail profil.
+Pembuatan transaksi draft (form input setoran) masih menunggu keputusan tim
+soal alur input di lapangan — endpoint yang sudah ada beroperasi pada
+transaksi yang sudah ada (lihat `prisma/seed-phase3-test-data.sql` untuk
+men-seed transaksi dan penarikan uji coba).
 
 ## Status Implementasi
 
-Fondasi repository sebelumnya dibangun untuk sistem poin. Setelah wawancara, domain memerlukan migrasi menuju rupiah, tabungan, dan ledger finansial.
+Fondasi repository sebelumnya dibangun untuk sistem poin. Modul deposit/ledger/redemption/passbook (sesi 3) sudah dimigrasikan ke domain rupiah di bawah ini; pembuatan transaksi draft (form input setoran) masih menunggu keputusan tim soal alur input di lapangan.
 
 - [x] Fondasi PostgreSQL, constraint, index, trigger, dan RLS.
 - [x] Autentikasi pengurus dan identitas organisasi.
 - [x] Docker Compose, health check, dan CI GitHub Actions.
 - [x] Master awal jenis sampah.
-- [ ] Migrasi `points_per_kg` menjadi harga rupiah berversi dan skema harga.
+- [x] Migrasi `points_per_kg` menjadi harga rupiah berversi dan skema harga (`waste_price_versions`).
 - [x] Profil `INDIVIDUAL` dan `UNIT`, relasi unit, filter, dan soft-delete.
-- [ ] Transaksi `DIRECT_CASH` dan `SAVINGS`.
-- [ ] Ledger rupiah, opening balance, dan reversal.
-- [ ] Penarikan tabungan.
+- [x] Transaksi `DIRECT_CASH` dan `SAVINGS` — finalize/settle/cancel sudah ada; pembuatan draft belum.
+- [x] Ledger rupiah dan reversal (skema + trigger); pembuatan entri `OPENING_BALANCE`/`ADJUSTMENT` belum ada endpoint-nya.
+- [x] Penarikan tabungan (`REQUESTED -> APPROVED -> PAID` / `REJECTED`).
 - [ ] Impor CSV/XLSX.
-- [ ] Nota dan buku tabungan digital.
+- [x] Buku tabungan digital (passbook publik via token), dalam rupiah. Cetak nota belum ada.
 - [ ] Dashboard keaktifan serta rekap unit.
 - [ ] Permintaan penjemputan P1.
 
