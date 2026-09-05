@@ -20,6 +20,11 @@ interface CreateTransactionPayload {
   readonly items: readonly TransactionItemPayload[];
 }
 
+interface UpdateTransactionPayload {
+  readonly memberId: string;
+  readonly items: readonly TransactionItemPayload[];
+}
+
 export type TransactionStatus = "DRAFT" | "FINALIZED" | "COMPLETED" | "CANCELLED" | "VOIDED";
 
 export interface TransactionItem {
@@ -91,6 +96,27 @@ export async function createTransaction(payload: CreateTransactionPayload): Prom
 export async function finalizeTransaction(id: string): Promise<Transaction> {
   try {
     const response = await api.post<TransactionResponse>(`/transactions/${id}/finalize`);
+    return response.data.data.transaction;
+  } catch (error: unknown) {
+    throw new Error(messageFrom(error));
+  }
+}
+
+export async function getTransactionById(id: string): Promise<Transaction> {
+  try {
+    const response = await api.get<TransactionResponse>(`/transactions/${id}`);
+    return response.data.data.transaction;
+  } catch (error: unknown) {
+    throw new Error(messageFrom(error));
+  }
+}
+
+export async function updateTransaction(
+  id: string,
+  payload: UpdateTransactionPayload,
+): Promise<Transaction> {
+  try {
+    const response = await api.patch<TransactionResponse>(`/transactions/${id}`, payload);
     return response.data.data.transaction;
   } catch (error: unknown) {
     throw new Error(messageFrom(error));

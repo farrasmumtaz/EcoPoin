@@ -1,11 +1,11 @@
 "use client";
 
-import { Search, Plus, Eye } from "lucide-react";
+import { Search, Plus, Pencil, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 
-import { getMembers } from "@/app/services/members/members"; // adjust to your actual path
+import { deactivateMember, getMembers } from "@/app/services/members/members";
 
 const PAGE_SIZE = 9;
 
@@ -19,6 +19,7 @@ export default function DataWarga() {
   >([]);
   const [totalPages, setTotalPages] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const router = useRouter();
 
@@ -76,6 +77,18 @@ export default function DataWarga() {
 
   const goToEditWarga = (member: (typeof items)[number]) => {
     router.push(`/data-warga/edit-warga?id=${encodeURIComponent(member.id)}`);
+  };
+
+  const handleDeactivate = async (member: (typeof items)[number]): Promise<void> => {
+    if (!window.confirm(`Nonaktifkan warga "${member.fullName}"? Riwayat transaksi tetap tersimpan.`)) return;
+    setDeletingId(member.id);
+    try {
+      await deactivateMember(member.id);
+      setItems((current) => current.filter((item) => item.id !== member.id));
+      toast.success("Warga berhasil dinonaktifkan.");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Warga gagal dinonaktifkan.");
+    } finally { setDeletingId(null); }
   };
 
   return (
@@ -149,13 +162,22 @@ export default function DataWarga() {
                       {member.phone ?? "-"}
                     </td>
                     <td className="px-6 py-4">
-                      <div className="flex justify-end">
+                      <div className="flex justify-end gap-2">
                         <button
-                          aria-label={`Lihat ${member.fullName}`}
+                          aria-label={`Edit ${member.fullName}`}
                           onClick={() => goToEditWarga(member)}
                           className="flex h-8 w-9 items-center justify-center rounded-md border border-gray-300 text-font transition hover:border-primary hover:text-primary duration-300 cursor-pointer"
                         >
-                          <Eye size={15} />
+                          <Pencil size={15} />
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={`Nonaktifkan ${member.fullName}`}
+                          disabled={deletingId === member.id}
+                          onClick={() => void handleDeactivate(member)}
+                          className="flex h-8 w-9 items-center justify-center rounded-md border border-danger text-danger transition hover:bg-danger hover:text-white disabled:opacity-50 cursor-pointer"
+                        >
+                          <Trash2 size={15} />
                         </button>
                       </div>
                     </td>
