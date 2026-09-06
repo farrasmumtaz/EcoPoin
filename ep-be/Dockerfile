@@ -1,6 +1,7 @@
 FROM node:24.12.0-alpine AS dependencies
 WORKDIR /app
-COPY package.json package-lock.json ./
+COPY package.json package-lock.json prisma.config.ts ./
+COPY prisma ./prisma
 RUN npm ci
 
 FROM node:24.12.0-alpine AS builder
