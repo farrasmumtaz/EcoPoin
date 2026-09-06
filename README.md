@@ -514,3 +514,5 @@ hanya menerima pull request dari `dev` untuk versi yang sudah diuji bersama.
 ## Tim
 
 EcoPoin dikembangkan oleh tim mahasiswa untuk kategori Web Development ITechno Cup 2026.
+
+![alt text](image.png)
